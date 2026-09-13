@@ -41,8 +41,8 @@ gives genuine Pencil input with hot reload, and the Mac cannot test the only
 input device this app has. Allow `node` through the macOS firewall when asked,
 or the iPad hangs with no error.
 
-`npm run build` is the gate — `tsc -b` covers the app *and* the functions, since
-the function is where the money is. No test framework, matching the siblings.
+`npm run build` is the gate — `tsc -b` covers the app *and* the functions,
+since that is where the money is. No test framework, matching the siblings.
 
 ## Status
 
