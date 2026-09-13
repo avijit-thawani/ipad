@@ -42,16 +42,20 @@ const COLORS = [
   ['violet', '🟣 Violet'],
 ] as const;
 
-/** The bar scales with the setting, so the width is shown and not just named. */
+/**
+ * Each option names its own control, so no separate "Stroke" label is needed
+ * beside the select — which matters when everything shares one row. The bar
+ * scales with the setting, so the width is shown and not only named.
+ */
 const SIZES = [
-  ['s', 'Thin ▏'],
-  ['m', 'Medium ▍'],
-  ['l', 'Thick ▊'],
-  ['xl', 'Heavy █'],
+  ['s', 'Stroke S ▏'],
+  ['m', 'Stroke M ▍'],
+  ['l', 'Stroke L ▊'],
+  ['xl', 'Stroke XL █'],
 ] as const;
 
 const iconButton = (active: boolean) =>
-  `p-1.5 rounded-field border transition-colors ${
+  `p-1 rounded-field border transition-colors ${
     active
       ? 'bg-base-content text-base-100 border-base-content'
       : 'bg-base-100 border-base-content/15 text-base-content/70'
@@ -60,8 +64,6 @@ const iconButton = (active: boolean) =>
 const select =
   'rounded-field bg-base-100 border-2 border-base-content/15 px-2 py-1 text-xs ' +
   'focus:border-primary/60 focus:outline-none';
-
-const label = 'text-xs text-base-content/60';
 
 export default function CanvasTools({ editor }: { editor: Editor | null }) {
   const [tool, setTool] = useState<string>('draw');
@@ -95,7 +97,7 @@ export default function CanvasTools({ editor }: { editor: Editor | null }) {
   }
 
   return (
-    <div className="flex items-center gap-2 flex-wrap">
+    <div className="flex items-center gap-1.5 shrink-0">
       <div className="flex gap-1">
         {TOOLS.map(({ id, label: name, Icon }) => (
           <button
@@ -125,7 +127,6 @@ export default function CanvasTools({ editor }: { editor: Editor | null }) {
         ))}
       </select>
 
-      <span className={label}>Stroke</span>
       <select
         value={size}
         onChange={(e) => pickSize(e.target.value)}

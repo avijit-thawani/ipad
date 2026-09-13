@@ -14,15 +14,19 @@ import { ADHERENCE, STYLES, findAdherence, findStyle } from '../../shared/prompt
  * - **Effort** is the leaky one. There is no reasoning-effort concept for image
  *   models; the nearest equivalents are `quality` (only 9 of 52 models) and
  *   `resolution` (19), which are different parameters with different values.
- *   The slider maps onto whichever the chosen model exposes, and is replaced by
- *   a word for models exposing neither — a permanently greyed-out slider next
- *   to a live one just looked broken.
+ *   The slider maps onto whichever the chosen model exposes, and disappears
+ *   for models exposing neither — a permanently greyed-out slider beside a
+ *   live one read as broken rather than as inapplicable.
  *
  * Returns a fragment, not a row: it shares one line with the Generate button
  * in DrawPage, because three stacked rows of controls was most of the screen.
  *
  * Aspect ratio is not shown. It is derived from the canvas and cannot be
  * chosen, so displaying it only invited the question of how to change it.
+ *
+ * Neither slider shows its value as text: the handle position already carries
+ * it, and the words cost more width than they earned. The tooltip has the full
+ * clause for whoever wants it.
  *
  * Per-run timings and costs are deliberately absent; they go to
  * `renders/log.jsonl`, which survives a restart.
@@ -31,7 +35,7 @@ const select =
   'rounded-field bg-base-100 border-2 border-base-content/15 px-2 py-1 text-xs ' +
   'focus:border-primary/60 focus:outline-none';
 
-const label = 'text-xs text-base-content/60';
+const label = 'text-[11px] text-base-content/60 whitespace-nowrap';
 
 export default function Settings({
   model,
@@ -75,7 +79,7 @@ export default function Settings({
         value={model.id}
         onChange={(e) => onModel(e.target.value)}
         aria-label="Model"
-        className={`${select} max-w-44`}
+        className={`${select} max-w-32`}
       >
         {MODELS.map((m) => (
           <option key={m.id} value={m.id}>
@@ -95,40 +99,29 @@ export default function Settings({
           step={1}
           value={adherence}
           onChange={(e) => onAdherence(Number(e.target.value))}
-          className="range range-xs w-20"
-          title={findAdherence(adherence)?.clause}
+          className="range range-xs w-16"
+          title={`${findAdherence(adherence)?.label} — ${findAdherence(adherence)?.clause}`}
         />
-        <span className="text-xs text-base-content/50 w-16">
-          {findAdherence(adherence)?.label}
-        </span>
       </div>
 
-      <div className="flex items-center gap-1.5 shrink-0">
-        <span className={label}>Effort</span>
-        {model.effortAxis ? (
-          <>
-            <input
-              type="range"
-              min={0}
-              max={3}
-              step={1}
-              value={effort}
-              onChange={(e) => onEffort(Number(e.target.value) as EffortLevel)}
-              className="range range-xs w-20"
-            />
-            <span className="text-xs text-base-content/50 w-20">
-              {EFFORT_LABELS[effort]} {model.effortStops[effort]}
-            </span>
-          </>
-        ) : (
-          <span
-            className="text-xs text-base-content/40"
-            title={`${model.label} renders at one quality, so there is nothing to trade off`}
-          >
-            fixed
-          </span>
-        )}
-      </div>
+      {/* Absent entirely, rather than shown as disabled or as the word
+          "fixed", for a model that renders at one quality: there is nothing to
+          trade off, so the control is noise. */}
+      {model.effortAxis && (
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className={label}>Effort</span>
+          <input
+            type="range"
+            min={0}
+            max={3}
+            step={1}
+            value={effort}
+            onChange={(e) => onEffort(Number(e.target.value) as EffortLevel)}
+            className="range range-xs w-16"
+            title={`${EFFORT_LABELS[effort]} — ${model.effortAxis} ${model.effortStops[effort]}`}
+          />
+        </div>
+      )}
 
       {model.slowAtHighEffort && effort >= 2 && (
         <span className="text-xs text-warning" title={model.priceNote}>

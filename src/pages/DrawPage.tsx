@@ -219,7 +219,29 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
           />
         </div>
 
-        <div className="w-1/2 min-w-0 flex items-center justify-center bg-base-100 overflow-hidden">
+        <div className="relative w-1/2 min-w-0 flex items-center justify-center bg-base-100 overflow-hidden">
+          {/* Session controls, not render controls — they belong to the page
+              rather than to the next generation, so they sit up here instead
+              of taking width in the control bar. */}
+          <div className="absolute top-2 right-3 z-10 flex items-center gap-3 text-xs">
+            {turns.length > 0 && (
+              <button
+                onClick={() => setShowHistory(!showHistory)}
+                className="text-base-content/50 underline"
+              >
+                {showHistory ? 'Hide' : `History ${turns.length}`}
+              </button>
+            )}
+            {result && !viewing && (
+              <a href={result.image} download="render.png" className="link text-base-content/50">
+                Save
+              </a>
+            )}
+            <button onClick={signOut} className="link text-base-content/30">
+              Log out
+            </button>
+          </div>
+
           {busy ? (
             <Progress boundSeconds={model.measuredSeconds} />
           ) : shown ? (
@@ -237,8 +259,6 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
       </div>
 
       <div className="shrink-0 border-t border-base-300 bg-base-200 px-3 pt-2.5 flex flex-col gap-2.5 safe-bottom">
-        <CanvasTools editor={editor} />
-
         {/* A free-text box is commented out rather than deleted: the style and
             adherence dropdowns cover everything so far, and an empty textbox
             was only inviting work. `prompt` is still threaded through the
@@ -254,48 +274,35 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
         />
         */}
 
-        {/* Settings and the actions share one line — three stacked rows of
-            controls was most of the screen. Settings returns a fragment so its
-            children are direct members of this flex row. */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <Settings
-            model={model}
-            onModel={setModelId}
-            style={style}
-            onStyle={setStyle}
-            effort={effort}
-            onEffort={setEffort}
-            adherence={adherence}
-            onAdherence={setAdherence}
-          />
+        {/* One row, two halves, mirroring the panes above: what governs the
+            canvas on the left, what governs the render on the right. Each half
+            is nowrap so the split survives, and the row scrolls rather than
+            wraps if a model with an effort slider makes it too wide — a
+            control bar that changes height when you change model is worse than
+            one that occasionally scrolls. */}
+        <div className="flex items-center justify-between gap-3 overflow-x-auto">
+          <CanvasTools editor={editor} />
 
-          <button
-            onClick={onGenerate}
-            disabled={busy}
-            className="btn btn-chunky btn-primary btn-sm rounded-field font-semibold shrink-0"
-          >
-            {busy ? 'Drawing…' : 'Generate'}
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <Settings
+              model={model}
+              onModel={setModelId}
+              style={style}
+              onStyle={setStyle}
+              effort={effort}
+              onEffort={setEffort}
+              adherence={adherence}
+              onAdherence={setAdherence}
+            />
 
-          {/* Collapsed by default. Growing inline is what squeezed everything
-              else in this row as the session went on. */}
-          {turns.length > 0 && (
             <button
-              onClick={() => setShowHistory(!showHistory)}
-              className="text-xs text-base-content/60 shrink-0 underline"
+              onClick={onGenerate}
+              disabled={busy}
+              className="btn btn-chunky btn-primary btn-sm rounded-field font-semibold shrink-0"
             >
-              {showHistory ? 'Hide history' : `History ${turns.length}`}
+              {busy ? 'Drawing…' : 'Generate'}
             </button>
-          )}
-
-          {result && !viewing && (
-            <a href={result.image} download="render.png" className="link text-xs shrink-0">
-              Save
-            </a>
-          )}
-          <button onClick={signOut} className="link text-xs text-base-content/30 shrink-0">
-            Log out
-          </button>
+          </div>
         </div>
 
         {showHistory && turns.length > 0 && (
