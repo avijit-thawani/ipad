@@ -189,7 +189,7 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
 
         <div className="w-1/2 min-w-0 flex items-center justify-center bg-base-100 overflow-hidden">
           {busy ? (
-            <Progress expectedSeconds={model.measuredSeconds} />
+            <Progress boundSeconds={model.measuredSeconds} />
           ) : shown ? (
             <img
               src={shown}

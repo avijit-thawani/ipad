@@ -52,6 +52,10 @@ export type ModelSpec = {
    * Measured, at lowest effort, by `tools/compare-models.ts` on one sketch —
    * so indicative rather than a benchmark, but real, which is more than
    * OpenRouter offers. Seconds for the whole round trip.
+   *
+   * The progress bar treats this as an **upper bound** rather than an average:
+   * a render that arrives sooner just cuts the bar short, which is the common
+   * case and needs no special handling.
    */
   measuredSeconds: number;
   /** Measured cost of that same call, in USD. */
