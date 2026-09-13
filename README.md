@@ -50,40 +50,33 @@ the function is where the money is. No test framework, matching the siblings.
 
 ## Status
 
-Working: password gate, canvas with local IndexedDB persistence, export to PNG,
-one round of sketch + prompt to a render, a session strip of past rounds.
+Built: password gate, canvas with IndexedDB persistence, PNG export, one round
+of sketch + prompt to a render, a session strip of past rounds. Auth, payload
+validation and upstream error passthrough are verified by curl; the login
+screen renders on the iPad.
 
-Verified by curl, not yet on hardware: auth rejects absent, forged and expired
-tokens; the sketch must be an image data URL and under 4 MB; an upstream failure
-is passed through with its status instead of becoming a blank 502. **Nobody has
-drawn on this with an actual Pencil yet** — that is the next thing that happens,
-and the pressure and Scribble notes below are from the literature, not from use.
+**Nothing has been drawn with an actual Pencil yet**, so the pressure and
+Scribble notes below come from the literature rather than from use, and no
+generated image has ever been produced. Not built: iterating on a previous
+round, AI strokes returning to the canvas, server-side storage.
 
-Not built yet: iterating on a previous round, AI strokes coming back onto the
-canvas, any server-side storage.
+Because the device has no reachable console, failures print themselves onto the
+page — an `ErrorBoundary`, plus an ES5 handler in `index.html` that is
+deliberately not a module so it survives a syntax error in the bundle. Both end
+with the user agent, which is what identifies a Safari too old for something.
 
 ## Gotchas
 
-- **Scribble eats every other `pointerdown`.** A long-standing Safari bug, not
-  a tldraw one: tap twice quickly and the second tap is dropped. Fix is iPad
-  Settings > Apple Pencil > Scribble, off. The known `preventDefault` on
-  `touchmove` workaround is deliberately not applied here because it also kills
-  two-finger pan.
-- **Safari still has no `getCoalescedEvents()`.** The Pencil samples at 240 Hz,
-  you see one per frame, so fast strokes come out as chords and the dropped
-  samples are unrecoverable. Turn off Settings > Safari > *Prefer Page
-  Rendering Updates near 60fps* and keep Low Power Mode off.
-- **tldraw needs a license key in production.** It runs unlicensed on
-  localhost, but on an HTTPS non-localhost domain it logs license errors. A
-  hobby license is free, discretionary, and keeps a "made with tldraw"
-  watermark you may not obscure. Request it *before* the first deploy.
-- **localStorage cannot hold the renders.** Two ~1 MB base64 PNGs per round
-  against a ~5 MB quota fails by the third sketch. The strip stores 320px JPEG
-  thumbnails; full-resolution output is in memory only — Download or lose it.
-- **Netlify's synchronous limit is 60s**, not the 10s the forums still talk
-  about. Generation takes 15-20s, which fits, and the function bails at 50s to
-  return a real message. The tighter constraint is the 6 MB buffered payload,
-  which is why the sketch exports at `pixelRatio: 1`.
+Two that shape the code, rather than just the setup. Turn **Scribble off** in
+iPad Settings > Apple Pencil, or Safari drops every other `pointerdown`. And
+**dev must be lowered for Safari separately from the build**: tldraw contains a
+class static block (Safari 16.4+), `build.target` does not touch dev, and the
+option that works is `optimizeDeps.rolldownOptions.transform.target` followed by
+deleting `node_modules/.vite`. Getting this wrong shows up as `Unexpected token
+'{'` at *login*, because the canvas is imported lazily.
+
+The rest, including everything that cost a debugging round, is in
+[GOTCHAS.md](GOTCHAS.md).
 
 ## Next
 

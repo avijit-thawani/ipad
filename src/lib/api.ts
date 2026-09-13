@@ -4,6 +4,26 @@ const BASE = '/.netlify/functions';
 export class Unauthorized extends Error {}
 
 /**
+ * Parse a response body as JSON, and when it is not JSON say what actually
+ * arrived. A bare "unexpected token" from the browser names neither the
+ * endpoint nor the status nor who answered, which on a device with no console
+ * is close to useless — the body itself is what identifies the culprit, since
+ * an HTML shell means the proxy missed and a JSON error means it did not.
+ */
+async function parseJson(response: Response, endpoint: string): Promise<unknown> {
+  const body = await response.text();
+  try {
+    return JSON.parse(body);
+  } catch {
+    const type = response.headers.get('content-type') ?? 'no content-type';
+    throw new Error(
+      `${endpoint} returned ${response.status} (${type}) that is not JSON.\n\n` +
+        `First 300 characters of the body:\n${body.slice(0, 300)}`
+    );
+  }
+}
+
+/**
  * Safari throws on any localStorage access when cookies are blocked or the tab
  * is private, and this one runs during the first render — unguarded it takes
  * the whole app down to a white screen before anything paints.
@@ -48,9 +68,13 @@ export async function login(password: string): Promise<void> {
         : `The server returned ${response.status}.`
     );
   }
-  const { token } = await response.json();
+  const payload = (await parseJson(response, 'login')) as { token?: unknown };
+  if (typeof payload.token !== 'string' || !payload.token) {
+    throw new Error(`login returned no token: ${JSON.stringify(payload).slice(0, 300)}`);
+  }
+
   try {
-    localStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(TOKEN_KEY, payload.token);
   } catch {
     throw new Error('Enable cookies for this site — the session cannot be saved.');
   }
@@ -71,11 +95,13 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
     clearToken();
     throw new Unauthorized('Session expired.');
   }
+
+  const endpoint = path.split('?')[0].replace(/^\//, '');
+  const payload = (await parseJson(response, endpoint)) as { error?: string };
   if (!response.ok) {
-    const detail = await response.json().catch(() => ({}));
-    throw new Error(detail.error ?? 'Something went wrong.');
+    throw new Error(payload.error ?? `${endpoint} returned ${response.status}.`);
   }
-  return response.json();
+  return payload as T;
 }
 
 export type Generated = {
