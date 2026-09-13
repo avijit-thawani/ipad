@@ -21,10 +21,9 @@ because the Generate button spends real money.
 
 ## The one rule
 
-The OpenRouter key never leaves the function, and `generate` starts with
-`requireAuth` and re-validates every choice against the catalog. Nothing in the
-bundle is prefixed `VITE_` except the tldraw license key, which is designed to
-be public. A stranger who finds the URL sees the login box and nothing else.
+The OpenRouter key never leaves the function; `generate` starts with
+`requireAuth` and re-validates every choice. Nothing in the bundle is prefixed
+`VITE_` bar the tldraw license key, which is meant to be public.
 
 ## Quick start
 
@@ -60,11 +59,11 @@ error in the bundle. Both end with the user agent.
 
 ## The three controls
 
-Landscape only: canvas left, render right, every control in one bottom bar.
-tldraw's toolbar and style panel are switched off (`HIDDEN_UI`) and replaced, so
-the left pane is drawing surface only. Both panes are exactly half the width,
-and the sketch exports at the **viewport** bounds rather than the shapes'
-bounding box — so the render returns the same shape as the space you drew in.
+Landscape only: canvas left, render right, controls in one bottom bar. tldraw's
+toolbar and style panel are off (`HIDDEN_UI`) and replaced, so the left pane is
+drawing surface only. Both panes are exactly half the width, and the sketch
+exports at the **viewport** bounds, not the shapes' bounding box — so the
+render returns the same shape as the space you drew in.
 
 | Axis | How orthogonal it really is |
 |---|---|
@@ -89,7 +88,7 @@ Everything else that cost a debugging round is in [GOTCHAS.md](GOTCHAS.md).
 
 ## Next
 
-- **Iterate on a round** rather than starting over: the model takes up to 14
+- **Iterate on a round** rather than starting over: models take up to 14
   reference images, so passing the previous render alongside the new sketch is
   a small change to `generate.ts`, and the obvious next feature.
 - **Seed, for holding one variable still** — two models support it
