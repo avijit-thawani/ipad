@@ -81,12 +81,20 @@ The rest, including everything that cost a debugging round, is in
 ## Next
 
 - **Iterate on a round** rather than starting over: the model takes up to 14
-  reference images, so the previous render plus the new sketch is a small change
-  to `generate.ts` and the obvious next feature.
-- **Model is one env var.** `IMAGE_MODEL` defaults to
-  `google/gemini-3.1-flash-image` (~$0.06/image); Seedream 4.5 and FLUX are a
-  dashboard edit away. Anything set here must support `input_references`.
-- **The prompt preamble is doing real work.** Told nothing, the model faithfully
-  reproduces wobbly pencil lines instead of realising the drawing. That one
-  paragraph in `generate.ts` is the difference between sketch-to-image and
-  sketch-cleanup, and is the first thing to tune if output disappoints.
+  reference images, so passing the previous render alongside the new sketch is
+  a small change to `generate.ts`, and the obvious next feature.
+- **Style buttons instead of describing a style every time.** The prompt is
+  currently one preamble in `generate.ts` (telling the model its input is a
+  sketch to realise, not pencil lines to copy) plus whatever you type; with an
+  empty box the model picks a style itself. Presets — ink, watercolour, 3D
+  render, photo, blueprint — appended as a clause would make a round two taps.
+  The preamble is also the first thing to tune if output disappoints.
+- **Model is one env var**, so comparing them is a `IMAGE_MODEL` edit. Verified
+  slugs that accept `input_references`: `google/gemini-3.1-flash-image` (Nano
+  Banana 2, the current default), `meta/muse-image`,
+  `openai/gpt-image-2.5-sunburst` and `-flare`, `openai/gpt-image-2`,
+  `bytedance-seed/seedream-5-0-pro`, `black-forest-labs/flux.2-pro`. A picker
+  in the UI beats an env var once there is more than one worth keeping.
+- **GLM 5.3 Flash cannot do this job.** `z-ai/glm-5.3-flash` reads images but
+  emits text only, as does every GLM on OpenRouter — it suits critiquing a
+  sketch or proposing the prompt, not generating the render.
