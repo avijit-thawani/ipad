@@ -25,12 +25,29 @@ export function clearToken(): void {
 }
 
 export async function login(password: string): Promise<void> {
-  const response = await fetch(`${BASE}/login`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ password }),
-  });
-  if (!response.ok) throw new Error('That password is wrong.');
+  let response: Response;
+  try {
+    response = await fetch(`${BASE}/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ password }),
+    });
+  } catch {
+    throw new Error('Could not reach the server. Is the dev server still running?');
+  }
+
+  // Only a 401 means the password was actually checked and rejected. Reporting
+  // every failure as a wrong password sent me hunting through a clean .env
+  // while the real problem was that the functions server had died and the Vite
+  // proxy was answering 502.
+  if (response.status === 401) throw new Error('That password is wrong.');
+  if (!response.ok) {
+    throw new Error(
+      response.status === 502
+        ? 'The functions server is not running — start `netlify functions:serve`.'
+        : `The server returned ${response.status}.`
+    );
+  }
   const { token } = await response.json();
   try {
     localStorage.setItem(TOKEN_KEY, token);
