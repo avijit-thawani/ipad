@@ -22,27 +22,32 @@ const TOOLS = [
   { id: 'eraser', label: 'Eraser' },
 ] as const;
 
-/** tldraw's palette, minus white, which is invisible on a white canvas. */
+/**
+ * Eight of tldraw's thirteen. White is invisible on a white canvas, and the
+ * four "light" variants are dropped so that every entry can carry a coloured
+ * disc that actually matches it — there is no pale-blue emoji, and two options
+ * showing the same disc would be worse than not offering the shade.
+ *
+ * The disc doubles as the control's own label: collapsed, the select reads
+ * "🔵 Blue", which says both what it is and what it is set to.
+ */
 const COLORS = [
-  ['black', 'Black', '#1d1d1d'],
-  ['grey', 'Grey', '#9fa8b2'],
-  ['blue', 'Blue', '#4263eb'],
-  ['light-blue', 'Light blue', '#4dabf7'],
-  ['green', 'Green', '#099268'],
-  ['light-green', 'Light green', '#40c057'],
-  ['yellow', 'Yellow', '#f1ac4b'],
-  ['orange', 'Orange', '#e16919'],
-  ['red', 'Red', '#e03131'],
-  ['light-red', 'Light red', '#ff8787'],
-  ['violet', 'Violet', '#ae3ec9'],
-  ['light-violet', 'Light violet', '#e599f7'],
+  ['black', '⚫ Black'],
+  ['grey', '⚪ Grey'],
+  ['blue', '🔵 Blue'],
+  ['green', '🟢 Green'],
+  ['yellow', '🟡 Yellow'],
+  ['orange', '🟠 Orange'],
+  ['red', '🔴 Red'],
+  ['violet', '🟣 Violet'],
 ] as const;
 
+/** The bar glyph shows the width; the nib says which control this is. */
 const SIZES = [
-  ['s', 'Thin'],
-  ['m', 'Medium'],
-  ['l', 'Thick'],
-  ['xl', 'Heavy'],
+  ['s', '✒️ Thin ▏'],
+  ['m', '✒️ Medium ▍'],
+  ['l', '✒️ Thick ▊'],
+  ['xl', '✒️ Heavy █'],
 ] as const;
 
 const chip = (active: boolean) =>
@@ -80,8 +85,6 @@ export default function CanvasTools({ editor }: { editor: Editor | null }) {
     editor.setStyleForNextShapes(DefaultSizeStyle, next as 'm');
   }
 
-  const swatch = COLORS.find(([id]) => id === color)?.[2] ?? '#1d1d1d';
-
   return (
     <div className="flex items-center gap-2 flex-wrap">
       <div className="flex gap-1">
@@ -92,27 +95,18 @@ export default function CanvasTools({ editor }: { editor: Editor | null }) {
         ))}
       </div>
 
-      <div className="flex items-center gap-1.5">
-        {/* The swatch is the only way to see the current colour at a glance,
-            since a select shows its value as text. */}
-        <span
-          aria-hidden
-          style={{ background: swatch }}
-          className="w-5 h-5 rounded-full border-2 border-base-content/20 shrink-0"
-        />
-        <select
-          value={color}
-          onChange={(e) => pickColor(e.target.value)}
-          aria-label="Stroke colour"
-          className={select}
-        >
-          {COLORS.map(([id, label]) => (
-            <option key={id} value={id}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </div>
+      <select
+        value={color}
+        onChange={(e) => pickColor(e.target.value)}
+        aria-label="Stroke colour"
+        className={select}
+      >
+        {COLORS.map(([id, label]) => (
+          <option key={id} value={id}>
+            {label}
+          </option>
+        ))}
+      </select>
 
       <select
         value={size}

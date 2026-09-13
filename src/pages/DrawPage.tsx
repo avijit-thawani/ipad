@@ -238,17 +238,6 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
 
       <div className="shrink-0 border-t border-base-300 bg-base-200 px-3 py-2 flex flex-col gap-2 safe-bottom">
         <CanvasTools editor={editor} />
-        <Settings
-          model={model}
-          onModel={setModelId}
-          style={style}
-          onStyle={setStyle}
-          effort={effort}
-          onEffort={setEffort}
-          adherence={adherence}
-          onAdherence={setAdherence}
-          aspect={aspect}
-        />
 
         {/* A free-text box is commented out rather than deleted: the style and
             adherence dropdowns cover everything so far, and an empty textbox
@@ -265,11 +254,26 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
         />
         */}
 
-        <div className="flex items-center gap-2">
+        {/* Settings and the actions share one line — three stacked rows of
+            controls was most of the screen. Settings returns a fragment so its
+            children are direct members of this flex row. */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Settings
+            model={model}
+            onModel={setModelId}
+            style={style}
+            onStyle={setStyle}
+            effort={effort}
+            onEffort={setEffort}
+            adherence={adherence}
+            onAdherence={setAdherence}
+            aspect={aspect}
+          />
+
           <button
             onClick={onGenerate}
             disabled={busy}
-            className="btn btn-chunky btn-primary rounded-field font-semibold shrink-0"
+            className="btn btn-chunky btn-primary btn-sm rounded-field font-semibold shrink-0"
           >
             {busy ? 'Drawing…' : 'Generate'}
           </button>
@@ -279,21 +283,19 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
           {turns.length > 0 && (
             <button
               onClick={() => setShowHistory(!showHistory)}
-              className="btn btn-ghost btn-sm rounded-field text-xs text-base-content/60 shrink-0"
+              className="text-xs text-base-content/60 shrink-0 underline"
             >
-              {showHistory ? 'Hide' : 'Past'} {turns.length}
+              {showHistory ? 'Hide' : `Past ${turns.length}`}
             </button>
           )}
 
-          <span className="flex-1" />
-
           {result && !viewing && (
             <a href={result.image} download="render.png" className="link text-xs shrink-0">
-              Download
+              Save
             </a>
           )}
-          <button onClick={signOut} className="link text-xs text-base-content/40 shrink-0">
-            Sign out
+          <button onClick={signOut} className="link text-xs text-base-content/30 shrink-0">
+            Exit
           </button>
         </div>
 

@@ -18,10 +18,20 @@ import { ADHERENCE, STYLES, findAdherence, findStyle } from '../../shared/prompt
  *   exposes, and it disables itself for models that expose neither rather than
  *   pretending to do something.
  *
- * Per-run timings and costs are deliberately not shown here — they go to
- * `renders/log.jsonl` on the server instead, which survives a restart. This
- * bar is for choosing, not for reading statistics.
+ * Returns a fragment, not a row: it shares one line with the Generate button
+ * in DrawPage, because three stacked rows of controls was most of the screen.
+ *
+ * Every option carries a leading emoji so that a collapsed select says which
+ * control it is as well as its value — "🎨 Free" and "✒️ Medium" than
+ * "Free" and "Medium", which told you nothing on their own.
+ *
+ * Per-run timings and costs are deliberately absent; they go to
+ * `renders/log.jsonl`, which survives a restart.
  */
+const select =
+  'rounded-field bg-base-100 border-2 border-base-content/15 px-2 py-1 text-xs ' +
+  'focus:border-primary/60 focus:outline-none';
+
 export default function Settings({
   model,
   onModel,
@@ -44,48 +54,41 @@ export default function Settings({
   aspect: string;
 }) {
   return (
-    // gap-x-4 with wrapping, and no fixed-width children: the readout used to
-    // be a fixed w-24 with nowrap text, which ran under the next control.
-    <div className="flex items-center gap-x-4 gap-y-2 flex-wrap">
-      {/* A dropdown rather than seven buttons: the styles were most of the
-          width of this row, and only one is ever active. */}
+    <>
       <select
         value={style}
         onChange={(e) => onStyle(e.target.value)}
         aria-label="Render style"
         title={findStyle(style)?.clause || 'No style clause; describe it yourself'}
-        className="rounded-field bg-base-100 border-2 border-base-content/15 px-2 py-1 text-xs
-                   focus:border-primary/60 focus:outline-none"
+        className={select}
       >
         {STYLES.map((s) => (
           <option key={s.id} value={s.id}>
-            {s.label}
+            🎨 {s.label}
           </option>
         ))}
       </select>
 
+      {/* Truncated rather than shown in full: the price and time matter when
+          choosing, and take too much width to keep on display afterwards. */}
       <select
         value={model.id}
         onChange={(e) => onModel(e.target.value)}
-        className="rounded-field bg-base-100 border-2 border-base-content/15 px-2 py-1 text-xs
-                   focus:border-primary/60 focus:outline-none"
+        aria-label="Model"
+        className={`${select} max-w-40`}
       >
         {MODELS.map((m) => (
           <option key={m.id} value={m.id}>
-            {m.label} · ${m.measuredUsd.toFixed(3)} · {m.measuredSeconds}s
+            🤖 {m.label} · ${m.measuredUsd.toFixed(3)} · {m.measuredSeconds}s
           </option>
         ))}
       </select>
 
-      {/* One flex item, so the label, slider and readout can never collide
-          with whatever wraps next to them. */}
-      <div className="flex items-center gap-2 shrink-0">
-        <span
-          className={`text-xs ${
-            model.effortAxis ? 'text-base-content/60' : 'text-base-content/30'
-          }`}
-        >
-          Effort
+      {/* One flex item each, so a label, slider and readout can never be split
+          across a wrap or collide with the control beside them. */}
+      <div className="flex items-center gap-1.5 shrink-0">
+        <span className={`text-xs ${model.effortAxis ? '' : 'opacity-30'}`} title="Effort">
+          ⚙️
         </span>
         <input
           type="range"
@@ -95,20 +98,17 @@ export default function Settings({
           value={effort}
           disabled={!model.effortAxis}
           onChange={(e) => onEffort(Number(e.target.value) as EffortLevel)}
-          className="range range-xs w-24 disabled:opacity-30"
+          className="range range-xs w-20 disabled:opacity-30"
         />
-        <span className="text-xs text-base-content/50">
-          {model.effortAxis
-            ? `${EFFORT_LABELS[effort]} · ${model.effortStops[effort]}`
-            : 'fixed'}
+        <span className="text-xs text-base-content/50 w-20">
+          {model.effortAxis ? `${EFFORT_LABELS[effort]} ${model.effortStops[effort]}` : 'fixed'}
         </span>
       </div>
 
-      {/* Prompt text, not a request parameter — no model has a knob for this —
-          so unlike effort it works identically on every model. Five stops
-          because each is a hand-written variant, not an interpolated number. */}
-      <div className="flex items-center gap-2 shrink-0">
-        <span className="text-xs text-base-content/60">Sketch</span>
+      <div className="flex items-center gap-1.5 shrink-0">
+        <span className="text-xs" title="How literally to follow the sketch">
+          ✏️
+        </span>
         <input
           type="range"
           min={ADHERENCE[0].level}
@@ -116,23 +116,25 @@ export default function Settings({
           step={1}
           value={adherence}
           onChange={(e) => onAdherence(Number(e.target.value))}
-          className="range range-xs w-24"
+          className="range range-xs w-20"
           title={findAdherence(adherence)?.clause}
         />
-        <span className="text-xs text-base-content/50">
+        <span className="text-xs text-base-content/50 w-16">
           {findAdherence(adherence)?.label}
         </span>
       </div>
 
-      {/* Shown rather than chosen: derived from the canvas so the render comes
-          back the same shape as what you drew. */}
-      <span className="text-xs text-base-content/40">{aspect}</span>
+      {/* Derived from the canvas, so the render is the same shape as what you
+          drew. Shown rather than chosen. */}
+      <span className="text-xs text-base-content/40" title="Output aspect ratio">
+        {aspect}
+      </span>
 
       {model.slowAtHighEffort && effort >= 2 && (
         <span className="text-xs text-warning" title={model.priceNote}>
-          may exceed the 50s cap
+          may exceed 50s
         </span>
       )}
-    </div>
+    </>
   );
 }
