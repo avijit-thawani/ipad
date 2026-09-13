@@ -88,7 +88,6 @@ The rest, including everything that cost a debugging round, is in
   sketch to realise, not pencil lines to copy) plus whatever you type; with an
   empty box the model picks a style itself. Presets — ink, watercolour, 3D
   render, photo, blueprint — appended as a clause would make a round two taps.
-  The preamble is also the first thing to tune if output disappoints.
 - **Model is one env var**, so comparing them is a `IMAGE_MODEL` edit. Verified
   slugs that accept `input_references`: `google/gemini-3.1-flash-image` (Nano
   Banana 2, the current default), `meta/muse-image`,
