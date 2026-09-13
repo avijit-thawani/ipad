@@ -70,17 +70,16 @@ canvas, any server-side storage.
   `touchmove` workaround is deliberately not applied here because it also kills
   two-finger pan.
 - **Safari still has no `getCoalescedEvents()`.** The Pencil samples at 240 Hz,
-  you see one sample per frame, so fast strokes come out as chords. Turn off
-  Settings > Safari > *Prefer Page Rendering Updates near 60fps* and keep Low
-  Power Mode off. There is no way to recover the dropped samples.
+  you see one per frame, so fast strokes come out as chords and the dropped
+  samples are unrecoverable. Turn off Settings > Safari > *Prefer Page
+  Rendering Updates near 60fps* and keep Low Power Mode off.
 - **tldraw needs a license key in production.** It runs unlicensed on
   localhost, but on an HTTPS non-localhost domain it logs license errors. A
   hobby license is free, discretionary, and keeps a "made with tldraw"
   watermark you may not obscure. Request it *before* the first deploy.
 - **localStorage cannot hold the renders.** Two ~1 MB base64 PNGs per round
-  against a ~5 MB quota means the third sketch would fail. The session strip
-  stores 320px JPEG thumbnails; full-resolution output lives in memory only, so
-  Download it or lose it on reload.
+  against a ~5 MB quota fails by the third sketch. The strip stores 320px JPEG
+  thumbnails; full-resolution output is in memory only — Download or lose it.
 - **Netlify's synchronous limit is 60s**, not the 10s the forums still talk
   about. Generation takes 15-20s, which fits, and the function bails at 50s to
   return a real message. The tighter constraint is the 6 MB buffered payload,
