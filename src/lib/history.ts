@@ -42,24 +42,13 @@ export type Turn = {
   resultThumb: string;
 };
 
-/**
- * What a model has actually cost and how long it has actually taken, averaged
- * over this browser's history. The catalog's figures are estimates derived
- * from per-token pricing; these are the real ones.
+/*
+ * There was an `observe()` here that averaged cost and latency per model for
+ * display in the bar. Removed: the app is for drawing, and the same numbers
+ * are recorded far more durably in `renders/log.jsonl` by the function, which
+ * survives a server restart and a cleared browser. `elapsedMs` and `costUsd`
+ * stay on each turn for the thumbnail tooltip.
  */
-export type Observed = { runs: number; meanMs: number; meanCost: number | null };
-
-export function observe(turns: Turn[], modelId: string): Observed | null {
-  const mine = turns.filter((t) => t.model === modelId);
-  if (!mine.length) return null;
-
-  const costs = mine.map((t) => t.costUsd).filter((c): c is number => typeof c === 'number');
-  return {
-    runs: mine.length,
-    meanMs: Math.round(mine.reduce((sum, t) => sum + (t.elapsedMs || 0), 0) / mine.length),
-    meanCost: costs.length ? costs.reduce((a, b) => a + b, 0) / costs.length : null,
-  };
-}
 
 /**
  * Draw a data URL into a canvas no bigger than THUMB_PX on its long edge and

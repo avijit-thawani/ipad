@@ -39,10 +39,15 @@ const FALLBACK_PROMPT =
  * the output. Local dev only: Netlify's filesystem is read-only apart from
  * /tmp, so a failure here is ignored rather than allowed to lose a paid render.
  */
-async function saveForDebugging(sketch: string, b64: string, prompt: string): Promise<void> {
+async function saveForDebugging(
+  sketch: string,
+  b64: string,
+  prompt: string,
+  stats: Record<string, unknown>
+): Promise<void> {
   if (!process.env.DEBUG_SAVE_RENDERS) return;
   try {
-    const { mkdir, writeFile } = await import('node:fs/promises');
+    const { mkdir, writeFile, appendFile } = await import('node:fs/promises');
     const dir = 'renders';
     await mkdir(dir, { recursive: true });
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -51,6 +56,11 @@ async function saveForDebugging(sketch: string, b64: string, prompt: string): Pr
     await writeFile(`${base}-sketch.png`, Buffer.from(sketchB64, 'base64'));
     await writeFile(`${base}-render.png`, Buffer.from(b64, 'base64'));
     await writeFile(`${base}-prompt.txt`, prompt);
+
+    // Appended, one JSON object per line, so the record of what each model
+    // cost and how long it took outlives any number of server restarts — the
+    // app deliberately shows none of this.
+    await appendFile(`${dir}/log.jsonl`, `${JSON.stringify({ at: stamp, ...stats })}\n`);
   } catch {
     // Never fail a generation over a debug artefact.
   }
@@ -120,6 +130,7 @@ export default async (request: Request): Promise<Response> => {
     .join(' ');
   const asked = instruction || FALLBACK_PROMPT;
 
+  const startedAt = Date.now();
   let response: Response;
   try {
     response = await fetch('https://openrouter.ai/api/v1/images', {
@@ -162,11 +173,23 @@ export default async (request: Request): Promise<Response> => {
     return json({ error: 'the model returned no image' }, 502);
   }
 
-  await saveForDebugging(sketch, image.b64_json, `${PREAMBLE}\n\n${asked}`);
+  const cost = typeof result.usage?.cost === 'number' ? result.usage.cost : null;
+  const seconds = Number(((Date.now() - startedAt) / 1000).toFixed(1));
+
+  await saveForDebugging(sketch, image.b64_json, `${PREAMBLE}\n\n${asked}`, {
+    model: model.id,
+    seconds,
+    cost,
+    effort,
+    effortParam: effortParams(model, effort),
+    style: style.id,
+    aspect,
+    mediaType: image.media_type ?? null,
+  });
 
   return json({
     image: `data:${image.media_type ?? 'image/png'};base64,${image.b64_json}`,
     model: model.id,
-    cost: typeof result.usage?.cost === 'number' ? result.usage.cost : null,
+    cost,
   });
 };

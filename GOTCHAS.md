@@ -72,7 +72,9 @@ Each of these cost a debugging round. Verified Sept 2026, iPad + Pencil 1.
 - **OpenRouter publishes no latency for image models.** The per-endpoint
   records carry pricing, parameters and streaming support, and no timing field
   at all. The only honest latency is measured locally, which is why every turn
-  records `elapsedMs` and the bar shows a per-model mean.
+  appends model, seconds, cost, effort, style and aspect to
+  `renders/log.jsonl` — append-only, so it outlives a server restart. The app
+  shows none of it: it is for drawing, not for reading statistics.
 - **`meta/muse-image` has zero endpoints**, so nothing serves it and it cannot
   be called, despite appearing in the model list. Check `endpoints` is
   non-empty before adding a slug to the catalog.

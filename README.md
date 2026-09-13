@@ -46,30 +46,30 @@ since that is where the money is. No test framework, matching the siblings.
 ## Status
 
 **It works end to end**: sketched on the iPad, one tap, a render came back.
-Auth, payload validation and upstream error passthrough are verified by curl.
-Unconfirmed on hardware: whether stroke width tracks Pencil pressure, and
-whether Scribble drops taps. Not built: iterating on a previous round, AI
-strokes returning to the canvas, server-side storage.
+Auth, payloads and error passthrough are verified by curl. Unconfirmed on
+hardware: whether stroke width tracks Pencil pressure, and whether Scribble
+drops taps. Not built: iterating on a round, server-side storage.
 
 `DEBUG_SAVE_RENDERS=1` writes every sketch, render and prompt to `renders/`
-(gitignored), the only way to compare what a prompt change did. The device has
-no reachable console, so failures print onto the page via an `ErrorBoundary`
-plus an ES5 handler in `index.html` — not a module, so it survives a syntax
-error in the bundle. Both end with the user agent.
+(gitignored) plus model, cost and seconds to `renders/log.jsonl`, append-only
+so it survives a restart. The device has no reachable console, so failures
+print onto the page via an `ErrorBoundary` plus an ES5 handler in `index.html`
+— not a module, so it survives a syntax error in the bundle. Both end with the
+user agent.
 
 ## The three controls
 
 Landscape only: canvas left, render right, controls in one bottom bar. tldraw's
-toolbar and style panel are off (`HIDDEN_UI`) and replaced, so the left pane is
-drawing surface only. Both panes are exactly half the width, and the sketch
-exports at the **viewport** bounds, not the shapes' bounding box — so the
-render returns the same shape as the space you drew in.
+toolbar and style panel are off (`HIDDEN_UI`) and replaced by pen and eraser
+alone. Both panes are exactly half the width, and the sketch exports at the
+**viewport** bounds, not the shapes' bounding box — so the render returns the
+same shape as the space you drew in.
 
 | Axis | How orthogonal it really is |
 |---|---|
 | **Style** | Completely — only text appended to the prompt, so every model takes it. |
 | **Model** | Completely — just a slug. |
-| **Effort** | Not underneath. No image model has a reasoning-effort concept; `quality` (9 of 52) and `resolution` (19) are different parameters. One slider mapped per model, disabled where neither exists. |
+| **Effort** | Not underneath. No image model has a reasoning-effort concept; `quality` (9 of 52) and `resolution` (19) are different parameters. One slider per model, disabled where neither exists, lowest by default. |
 
 Aspect ratio is derived, not chosen. The picker shows **measured** cost and
 seconds from `tools/compare-models.ts --yes`, which renders one sketch through

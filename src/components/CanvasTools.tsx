@@ -1,10 +1,5 @@
 import { useState } from 'react';
-import {
-  DefaultColorStyle,
-  DefaultSizeStyle,
-  GeoShapeGeoStyle,
-  type Editor,
-} from 'tldraw';
+import { DefaultColorStyle, DefaultSizeStyle, type Editor } from 'tldraw';
 
 /**
  * tldraw's own toolbar and style panel are hidden (see HIDDEN_UI in DrawPage)
@@ -17,16 +12,15 @@ import {
  * the only thing that sets it.
  */
 
+/**
+ * Pen and eraser only, deliberately. Shapes and select were clutter on a
+ * surface whose whole point is freehand; tldraw still has them if they are
+ * ever wanted back. `draw` is the tool tldraw starts in, so the initial
+ * highlight is already correct without setting anything.
+ */
 const TOOLS = [
-  { id: 'draw', label: 'Draw' },
-  { id: 'eraser', label: 'Erase' },
-  { id: 'select', label: 'Select' },
-] as const;
-
-const SHAPES = [
-  { geo: 'rectangle', label: 'Rect' },
-  { geo: 'ellipse', label: 'Oval' },
-  { geo: 'arrow-right', label: 'Arrow' },
+  { id: 'draw', label: 'Pen' },
+  { id: 'eraser', label: 'Eraser' },
 ] as const;
 
 /** tldraw's palette, minus white, which is invisible on a white canvas. */
@@ -78,13 +72,6 @@ export default function CanvasTools({ editor }: { editor: Editor | null }) {
     editor?.setCurrentTool(id);
   }
 
-  function pickShape(geo: (typeof SHAPES)[number]['geo']) {
-    if (!editor) return;
-    setTool(`geo:${geo}`);
-    editor.setStyleForNextShapes(GeoShapeGeoStyle, geo);
-    editor.setCurrentTool('geo');
-  }
-
   function pickColor(next: string) {
     if (!editor) return;
     setColor(next);
@@ -112,15 +99,6 @@ export default function CanvasTools({ editor }: { editor: Editor | null }) {
         {TOOLS.map((t) => (
           <button key={t.id} onClick={() => pickTool(t.id)} className={chip(tool === t.id)}>
             {t.label}
-          </button>
-        ))}
-        {SHAPES.map((s) => (
-          <button
-            key={s.geo}
-            onClick={() => pickShape(s.geo)}
-            className={chip(tool === `geo:${s.geo}`)}
-          >
-            {s.label}
           </button>
         ))}
       </div>

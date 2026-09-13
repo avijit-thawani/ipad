@@ -2,14 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Box, Tldraw, type Editor, type TLUiComponents } from 'tldraw';
 import 'tldraw/tldraw.css';
 import { Unauthorized, clearToken, generate, type Generated } from '../lib/api';
-import {
-  clearTurns,
-  loadTurns,
-  makeTurn,
-  observe,
-  saveTurns,
-  type Turn,
-} from '../lib/history';
+import { clearTurns, loadTurns, makeTurn, saveTurns, type Turn } from '../lib/history';
 import {
   DEFAULT_MODEL_ID,
   findModel,
@@ -17,6 +10,7 @@ import {
   type EffortLevel,
 } from '../../shared/models';
 import CanvasTools from '../components/CanvasTools';
+import Progress from '../components/Progress';
 import Settings from '../components/Settings';
 
 /**
@@ -62,7 +56,10 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
   const [prompt, setPrompt] = useState('');
   const [modelId, setModelId] = useState(DEFAULT_MODEL_ID);
   const [style, setStyle] = useState('none');
-  const [effort, setEffort] = useState<EffortLevel>(1);
+  // Lowest by default: it is the cheapest and fastest, and on a resolution-axis
+  // model it is also the only setting that cannot quietly cost more than it is
+  // worth. Raise it deliberately.
+  const [effort, setEffort] = useState<EffortLevel>(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<Generated | null>(null);
@@ -191,7 +188,9 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
         </div>
 
         <div className="w-1/2 min-w-0 flex items-center justify-center bg-base-100 overflow-hidden">
-          {shown ? (
+          {busy ? (
+            <Progress expectedSeconds={model.measuredSeconds} />
+          ) : shown ? (
             <img
               src={shown}
               alt="Generated render"
@@ -199,7 +198,7 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
             />
           ) : (
             <p className="text-base-content/30 text-sm px-8 text-center">
-              {busy ? 'Asking the model…' : 'Your render lands here, in this shape.'}
+              Your render lands here, in this shape.
             </p>
           )}
         </div>
@@ -215,7 +214,6 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
           effort={effort}
           onEffort={setEffort}
           aspect={aspect}
-          observed={observe(turns, model.id)}
         />
 
         <div className="flex items-center gap-2">
@@ -265,15 +263,9 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
           <span className="text-error truncate">{error}</span>
           <span className="text-base-content/50 shrink-0 flex gap-3 items-center">
             {result && !viewing && (
-              <>
-                <a href={result.image} download="render.png" className="link">
-                  Download
-                </a>
-                <span>
-                  {(result.elapsedMs / 1000).toFixed(1)}s
-                  {result.cost !== null && ` · $${result.cost.toFixed(3)}`}
-                </span>
-              </>
+              <a href={result.image} download="render.png" className="link">
+                Download
+              </a>
             )}
             <button onClick={signOut} className="link">
               Sign out

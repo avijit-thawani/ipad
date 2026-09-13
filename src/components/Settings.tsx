@@ -1,5 +1,4 @@
 import { EFFORT_LABELS, MODELS, STYLES, type EffortLevel, type ModelSpec } from '../../shared/models';
-import type { Observed } from '../lib/history';
 
 /**
  * The three control axes, which are orthogonal in the interface but not in the
@@ -13,6 +12,10 @@ import type { Observed } from '../lib/history';
  *   The slider is one control whose stops map to whichever the chosen model
  *   exposes, and it disables itself for models that expose neither rather than
  *   pretending to do something.
+ *
+ * Per-run timings and costs are deliberately not shown here — they go to
+ * `renders/log.jsonl` on the server instead, which survives a restart. This
+ * bar is for choosing, not for reading statistics.
  */
 export default function Settings({
   model,
@@ -22,7 +25,6 @@ export default function Settings({
   effort,
   onEffort,
   aspect,
-  observed,
 }: {
   model: ModelSpec;
   onModel: (id: string) => void;
@@ -31,7 +33,6 @@ export default function Settings({
   effort: EffortLevel;
   onEffort: (level: EffortLevel) => void;
   aspect: string;
-  observed: Observed | null;
 }) {
   const chip = (active: boolean) =>
     `px-2.5 py-1 rounded-field text-xs font-medium border transition-colors ${
@@ -41,7 +42,9 @@ export default function Settings({
     }`;
 
   return (
-    <div className="flex items-center gap-3 flex-wrap">
+    // gap-x-4 with wrapping, and no fixed-width children: the readout used to
+    // be a fixed w-24 with nowrap text, which ran under the next control.
+    <div className="flex items-center gap-x-4 gap-y-2 flex-wrap">
       <div className="flex gap-1 items-center">
         {STYLES.map((s) => (
           <button
@@ -59,26 +62,25 @@ export default function Settings({
         value={model.id}
         onChange={(e) => onModel(e.target.value)}
         className="rounded-field bg-base-100 border-2 border-base-content/15 px-2 py-1 text-xs
-                   focus:border-primary/60 focus:outline-none max-w-56"
+                   focus:border-primary/60 focus:outline-none"
       >
-        {/* Measured figures rather than advertised ones: the label is what you
-            actually paid and waited, from tools/compare-models.ts. */}
         {MODELS.map((m) => (
           <option key={m.id} value={m.id}>
             {m.label} · ${m.measuredUsd.toFixed(3)} · {m.measuredSeconds}s
-            {m.exceedsCap ? ' · too slow' : ''}
           </option>
         ))}
       </select>
 
-      <div className="flex items-center gap-2">
-        <label
-          className={`text-xs whitespace-nowrap ${
+      {/* One flex item, so the label, slider and readout can never collide
+          with whatever wraps next to them. */}
+      <div className="flex items-center gap-2 shrink-0">
+        <span
+          className={`text-xs ${
             model.effortAxis ? 'text-base-content/60' : 'text-base-content/30'
           }`}
         >
           Effort
-        </label>
+        </span>
         <input
           type="range"
           min={0}
@@ -87,39 +89,24 @@ export default function Settings({
           value={effort}
           disabled={!model.effortAxis}
           onChange={(e) => onEffort(Number(e.target.value) as EffortLevel)}
-          className="range range-xs w-28 disabled:opacity-30"
+          className="range range-xs w-24 disabled:opacity-30"
         />
-        <span className="text-xs text-base-content/50 w-24 whitespace-nowrap">
+        <span className="text-xs text-base-content/50">
           {model.effortAxis
-            ? `${EFFORT_LABELS[effort]} · ${model.effortAxis} ${model.effortStops[effort]}`
-            : 'not offered'}
+            ? `${EFFORT_LABELS[effort]} · ${model.effortStops[effort]}`
+            : 'fixed'}
         </span>
       </div>
 
-      {/* Shown rather than chosen: it is derived from the canvas so the render
-          comes back the same shape as what you drew. */}
-      <span className="text-xs text-base-content/40 whitespace-nowrap">shape {aspect}</span>
+      {/* Shown rather than chosen: derived from the canvas so the render comes
+          back the same shape as what you drew. */}
+      <span className="text-xs text-base-content/40">{aspect}</span>
 
-      {model.exceedsCap ? (
-        <span className="text-xs text-error whitespace-nowrap">
-          measured {model.measuredSeconds}s — over the 50s cap even at Draft
+      {model.slowAtHighEffort && effort >= 2 && (
+        <span className="text-xs text-warning" title={model.priceNote}>
+          may exceed the 50s cap
         </span>
-      ) : (
-        model.slowAtHighEffort &&
-        effort >= 2 && (
-          <span className="text-xs text-warning whitespace-nowrap" title={model.priceNote}>
-            may exceed the 50s cap
-          </span>
-        )
       )}
-
-      <span className="text-xs text-base-content/40 whitespace-nowrap">
-        {observed
-          ? `measured ${(observed.meanMs / 1000).toFixed(1)}s${
-              observed.meanCost !== null ? ` · $${observed.meanCost.toFixed(3)}` : ''
-            } over ${observed.runs}`
-          : model.blurb}
-      </span>
     </div>
   );
 }
