@@ -1,22 +1,15 @@
-import {
-  EFFORT_LABELS,
-  FIDELITY_MAX,
-  FIDELITY_MIN,
-  MODELS,
-  STYLES,
-  fidelityLabel,
-  type EffortLevel,
-  type ModelSpec,
-} from '../../shared/models';
+import { EFFORT_LABELS, MODELS, type EffortLevel, type ModelSpec } from '../../shared/models';
+import { ADHERENCE, STYLES, findAdherence } from '../../shared/prompts';
 
 /**
  * The four control axes, which are orthogonal in the interface but not in the
  * request:
  *
  * - **Style** is pure text appended to the prompt, so every model takes it.
- * - **Sketch** is the same trick: an adherence level out of 10, turned into a
- *   clause. No image model exposes a fidelity parameter, and the reference
- *   image is all-or-nothing, so prompt text is the only lever there is.
+ * - **Sketch** is the same trick: one of five hand-written adherence clauses,
+ *   from Interpret to Literal. No image model exposes a parameter for this,
+ *   and the reference image is all-or-nothing, so prompt text is the only
+ *   lever there is. The wording lives in shared/prompts.ts.
  * - **Model** is the slug.
  * - **Effort** is the leaky one. There is no reasoning-effort concept for image
  *   models; the nearest equivalents are `quality` (only 9 of 52 models) and
@@ -36,8 +29,8 @@ export default function Settings({
   onStyle,
   effort,
   onEffort,
-  fidelity,
-  onFidelity,
+  adherence,
+  onAdherence,
   aspect,
 }: {
   model: ModelSpec;
@@ -46,8 +39,8 @@ export default function Settings({
   onStyle: (id: string) => void;
   effort: EffortLevel;
   onEffort: (level: EffortLevel) => void;
-  fidelity: number;
-  onFidelity: (level: number) => void;
+  adherence: number;
+  onAdherence: (level: number) => void;
   aspect: string;
 }) {
   const chip = (active: boolean) =>
@@ -114,21 +107,23 @@ export default function Settings({
         </span>
       </div>
 
-      {/* Prompt text, not a request parameter — no image model has a fidelity
-          knob — so unlike effort this one works identically on every model. */}
+      {/* Prompt text, not a request parameter — no model has a knob for this —
+          so unlike effort it works identically on every model. Five stops
+          because each is a hand-written variant, not an interpolated number. */}
       <div className="flex items-center gap-2 shrink-0">
         <span className="text-xs text-base-content/60">Sketch</span>
         <input
           type="range"
-          min={FIDELITY_MIN}
-          max={FIDELITY_MAX}
+          min={ADHERENCE[0].level}
+          max={ADHERENCE[ADHERENCE.length - 1].level}
           step={1}
-          value={fidelity}
-          onChange={(e) => onFidelity(Number(e.target.value))}
+          value={adherence}
+          onChange={(e) => onAdherence(Number(e.target.value))}
           className="range range-xs w-24"
+          title={findAdherence(adherence)?.clause}
         />
         <span className="text-xs text-base-content/50">
-          {fidelityLabel(fidelity)} · {fidelity}/10
+          {findAdherence(adherence)?.label}
         </span>
       </div>
 

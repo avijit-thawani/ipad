@@ -1,15 +1,11 @@
 import { json, requireAuth } from '../lib/auth';
+import { DEFAULT_MODEL_ID, effortParams, findModel, type EffortLevel } from '../../shared/models';
 import {
-  DEFAULT_FIDELITY,
-  DEFAULT_MODEL_ID,
-  FIDELITY_MAX,
-  FIDELITY_MIN,
-  effortParams,
-  fidelityClause,
-  findModel,
+  DEFAULT_ADHERENCE,
+  buildPrompt,
+  findAdherence,
   findStyle,
-  type EffortLevel,
-} from '../../shared/models';
+} from '../../shared/prompts';
 
 /**
  * Netlify kills a synchronous function at 60s. Bailing at 50 leaves room to
@@ -19,25 +15,6 @@ const UPSTREAM_TIMEOUT_MS = 50_000;
 
 /** Netlify caps a buffered request at 6 MB; stop well short of it. */
 const MAX_SKETCH_BYTES = 4 * 1024 * 1024;
-
-/**
- * The model is handed a rough pencil drawing, not a photo. Without being told
- * so it tends to reproduce the wobbly lines faithfully — cleaning up the
- * sketch rather than realising it. Saying what the input *is* is what turns
- * this from image-editing into sketch-to-image.
- *
- * Deliberately says nothing about how closely to follow the drawing. That used
- * to live here as "keep the arrangement, proportions and placement", which
- * silently pinned every render near maximum adherence and would now contradict
- * a low setting. It is `fidelityClause` alone that speaks to that.
- */
-const PREAMBLE =
-  'The reference image is a rough hand-drawn sketch. Render it as a finished ' +
-  'image rather than copying the pencil strokes, and ignore stray marks.';
-
-const FALLBACK_PROMPT =
-  'Render the sketch as a detailed, well-lit illustration, choosing a style ' +
-  'that suits the subject.';
 
 /**
  * Write the sketch, the render and the exact prompt to `renders/` when
@@ -89,7 +66,7 @@ export default async (request: Request): Promise<Response> => {
     style?: unknown;
     effort?: unknown;
     aspect?: unknown;
-    fidelity?: unknown;
+    adherence?: unknown;
   };
   try {
     body = (await request.json()) as typeof body;
@@ -130,23 +107,17 @@ export default async (request: Request): Promise<Response> => {
     return json({ error: `${model.id} does not support aspect ${aspect.slice(0, 20)}` }, 400);
   }
 
-  const fidelity = typeof body.fidelity === 'number' ? body.fidelity : DEFAULT_FIDELITY;
-  if (!Number.isInteger(fidelity) || fidelity < FIDELITY_MIN || fidelity > FIDELITY_MAX) {
-    return json({ error: `fidelity must be an integer from ${FIDELITY_MIN} to ${FIDELITY_MAX}` }, 400);
-  }
+  const adherence = findAdherence(
+    typeof body.adherence === 'number' ? body.adherence : DEFAULT_ADHERENCE
+  );
+  if (!adherence) return json({ error: 'adherence must be a level from 1 to 5' }, 400);
 
-  const typed = typeof body.prompt === 'string' ? body.prompt.trim() : '';
-  // Fidelity and style are both clauses rather than request parameters, which
-  // is what makes them compose with every model. Ordered so the model is told
-  // what the input is, then how closely to follow it, then what it should
-  // become, then how to render it. Each part is terminated, because a typed
-  // fragment like "a hilltop cottage" otherwise runs into the clause beside it
-  // and reads as a continuation of it.
-  const asked =
-    [fidelityClause(fidelity), typed || (style.clause ? '' : FALLBACK_PROMPT), style.clause]
-      .filter(Boolean)
-      .map((part) => (/[.!?]$/.test(part) ? part : `${part}.`))
-      .join(' ') || FALLBACK_PROMPT;
+  // Assembled in one place, so this function never decides any wording.
+  const prompt = buildPrompt({
+    adherence,
+    style,
+    typed: typeof body.prompt === 'string' ? body.prompt : '',
+  });
 
   const startedAt = Date.now();
   let response: Response;
@@ -162,7 +133,7 @@ export default async (request: Request): Promise<Response> => {
       },
       body: JSON.stringify({
         model: model.id,
-        prompt: `${PREAMBLE}\n\n${asked}`,
+        prompt,
         input_references: [{ type: 'image_url', image_url: { url: sketch } }],
         ...(aspect ? { aspect_ratio: aspect } : {}),
         ...effortParams(model, effort),
@@ -194,14 +165,15 @@ export default async (request: Request): Promise<Response> => {
   const cost = typeof result.usage?.cost === 'number' ? result.usage.cost : null;
   const seconds = Number(((Date.now() - startedAt) / 1000).toFixed(1));
 
-  await saveForDebugging(sketch, image.b64_json, `${PREAMBLE}\n\n${asked}`, {
+  await saveForDebugging(sketch, image.b64_json, prompt, {
     model: model.id,
     seconds,
     cost,
     effort,
     effortParam: effortParams(model, effort),
     style: style.id,
-    fidelity,
+    adherence: adherence.level,
+    adherenceLabel: adherence.label,
     aspect,
     mediaType: image.media_type ?? null,
   });

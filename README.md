@@ -10,13 +10,14 @@ image model gets **both** — the drawing being the part a prompt cannot express
 
 A web app, not a Swift app: Safari has supported the stylus half of
 `PointerEvent` since iPadOS 13.5, and [tldraw](https://tldraw.dev) already does
-pressure strokes, palm rejection, colours and undo. Behind one password,
-because the Generate button spends real money.
+pressure strokes and palm rejection. Behind one password, because Generate
+spends real money.
 
 | Folder | What it is |
 |---|---|
-| `src/` | `pages/DrawPage.tsx` is the layout; `components/` holds the two control bars. |
-| `shared/models.ts` | the catalog and the four control axes, imported by **both** the UI and the function. |
+| `src/` | `pages/DrawPage.tsx` is the layout, `components/` the control bars. |
+| [`shared/prompts.ts`](shared/prompts.ts) | **every word sent to a model**: the preamble, the five adherence clauses, the styles, and `buildPrompt`. If output disappoints, read this and nothing else. |
+| [`shared/models.ts`](shared/models.ts) | the catalog: what each model costs, measures, and actually accepts. |
 | `netlify/functions/` | `login` issues a token, `generate` is the only holder of the OpenRouter key. |
 
 ## The one rule
@@ -52,10 +53,9 @@ drops taps. Not built: iterating on a round, server-side storage.
 
 `DEBUG_SAVE_RENDERS=1` writes every sketch, render and prompt to `renders/`
 (gitignored) plus model, cost and seconds to `renders/log.jsonl`, append-only
-so it survives a restart. The device has no reachable console, so failures
-print onto the page via an `ErrorBoundary` plus an ES5 handler in `index.html`
-— not a module, so it survives a syntax error in the bundle. Both end with the
-user agent.
+so it survives a restart. The device has no reachable console, so failures print
+onto the page via an `ErrorBoundary` plus an ES5 handler in `index.html` — not a
+module, so it survives a syntax error in the bundle. Both end with the UA.
 
 ## The four controls
 
@@ -63,18 +63,19 @@ Landscape only: canvas left, render right, controls in one bottom bar. tldraw's
 own UI is off (`HIDDEN_UI`), replaced by pen and eraser alone. Both panes are
 half the width, and the sketch exports at the **viewport** bounds, not the
 shapes' bounding box — so the render is the same shape as the space you drew in.
+No function decides wording: all four parts are assembled by `buildPrompt`.
 
 | Axis | How orthogonal it really is |
 |---|---|
 | **Style** | Completely — only text appended to the prompt, so every model takes it. |
-| **Sketch** | Completely, same reason: 1-10 adherence, rendered as a clause. No model has a fidelity parameter. |
+| **Sketch** | Completely, same reason. Five hand-written clauses, Interpret to Literal, naming what may drift: position, proportion, orientation, expression, colour. |
 | **Model** | Completely — just a slug. |
 | **Effort** | Not underneath. No image model has a reasoning-effort concept; `quality` (9 of 52) and `resolution` (19) are different parameters. One slider per model, disabled where neither exists, lowest by default. |
 
 Aspect ratio is derived, not chosen. The picker shows **measured** cost and
-seconds from `tools/compare-models.ts --yes`, which renders one sketch through
-every model in parallel — OpenRouter publishes no latency and bills most models
-per output token, so advertised figures were wrong by up to 7x.
+seconds from [`tools/compare-models.ts`](tools/compare-models.ts) — OpenRouter
+publishes no latency and bills most models per output token, so the advertised
+figures were wrong by up to 7x.
 
 ## Gotchas
 
@@ -91,9 +92,7 @@ Everything else that cost a debugging round is in [GOTCHAS.md](GOTCHAS.md).
 - **Iterate on a round** rather than starting over: models take up to 14
   reference images, so passing the previous render alongside the new sketch is
   a small change to `generate.ts`, and the obvious next feature.
-- **Seed, for holding one variable still** — two models support it
-  (`supportsSeed`), so you could change only the style and see only that change.
-- **A cheaper preview pass.** Nano Banana 2 Lite is half the price and ~2.7x
-  faster, so draft-then-commit would cost less than one careful render.
-- **GLM 5.3 Flash cannot render**, but it reads images — so it could critique a
-  sketch or write the prompt for you. Every GLM on OpenRouter is text-out only.
+- **Seed, for holding one variable still** — two models support it, so you
+  could change only the style and see only that change.
+- **GLM 5.3 Flash cannot render** but reads images, so it could critique a
+  sketch or write the prompt. Every GLM on OpenRouter is text-out only.
