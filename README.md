@@ -13,11 +13,11 @@ rejection. Behind one password, because Generate spends money.
 
 | Where | What it is |
 |---|---|
-| `src/` | `pages/DrawPage.tsx` is the layout, `components/` the control bar. |
+| `src/` | `pages/DrawPage.tsx` is the layout, `components/` the bar and transcript. |
 | [`shared/prompts.ts`](shared/prompts.ts) | **every word sent to a model**: preamble, the five faithfulness clauses, the styles, `buildPrompt`. If output disappoints, read this and nothing else. |
 | [`shared/models.ts`](shared/models.ts) | the catalog: what each model costs, measures and actually accepts. |
-| `netlify/functions/` | `login` issues a token, `generate` holds the OpenRouter key. |
-| [`tools/`](tools), [`docs/`](docs) | `compare-models.ts` and `compare-adherence.ts` spend real money to measure, so defaults are chosen rather than guessed; `docs/` holds one file per open design question. |
+| `netlify/functions/` | `login` issues a token, `generate` holds the key. |
+| [`tools/`](tools), [`docs/`](docs) | `compare-models.ts` and `compare-adherence.ts` spend real money to measure, so defaults are chosen not guessed; `docs/` holds the design questions. |
 
 ## The one rule
 
@@ -37,27 +37,27 @@ npx netlify functions:serve --port 9999    # both are needed
 Open `http://<mac-lan-ip>:5173` **on the iPad** — Vite prints it as `Network:`.
 Pointer events need no secure context, so plain HTTP over wifi gives real
 Pencil input with hot reload, and the Mac cannot test this app's only input
-device. Allow `node` through the macOS firewall or the iPad hangs silently.
-Vite hot-reloads the UI; **restart the functions server** after touching
-`netlify/` or `.env`. `npm run build` is the gate. No test framework.
+device. Allow `node` through the macOS firewall or the iPad hangs silently. Vite
+hot-reloads the UI; **restart the functions server** after touching `netlify/`
+or `.env`. `npm run build` is the gate; there is no test framework.
 
 ## Status
 
-**Works end to end**: sketch, one tap, a render comes back. Both survive a
-reload — the sketch via tldraw's IndexedDB, the last render via ours.
-Unconfirmed on hardware: whether stroke width tracks pressure, and whether
-Scribble drops taps. Not built: iterating on a round, server-side storage, and
-the free-text box, commented out in `DrawPage` but still wired through the
-request. `DEBUG_SAVE_RENDERS=1` logs every round to `renders/`.
+**Works end to end**: sketch, one tap, a render comes back. Everything survives
+a reload — the sketch via tldraw's IndexedDB, the transcript and last render via
+ours. Unconfirmed on hardware: whether stroke width tracks pressure, and whether
+Scribble drops taps. Not built: server-side storage, and the free-text box
+(commented out in `DrawPage`, still wired through). `DEBUG_SAVE_RENDERS=1` logs
+every round to `renders/`.
 
 ## The controls
 
 Landscape only, the bar mirroring the panes: canvas left (pen, eraser, select,
 colour, stroke, undo, redo, clear), render right (style, model, faithfulness,
-effort, Generate). tldraw's own UI is off (`HIDDEN_UI`); History/Save/Log out
-sit over the render's top right, being session not render controls. Panes are
-half the width each, and the sketch exports at the **viewport** bounds, not the
-shapes' bounding box, so the render is the same shape as what you drew in.
+effort, Generate). tldraw's own UI is off (`HIDDEN_UI`); the History toggle,
+Save, Clear and Log out sit over the render's top right. Panes are half the
+width each and the sketch exports at the **viewport** bounds, not the shapes'
+bounding box, so the render is the same shape as what you drew in.
 
 | Axis | How orthogonal it really is |
 |---|---|
@@ -71,29 +71,29 @@ Aspect ratio is derived from the canvas, not chosen. The picker shows
 models per output token, so advertised figures were wrong by up to 7x. Default
 is Nano Banana 2 Lite — fastest measured, and one quality whatever the effort.
 
-## Design choices
+**Design choices.** Faithfulness is five hand-written clauses, not a 1-10
+scale, because a bare number steers a model poorly. Every default traces to a
+`tools/` run rather than a published figure.
 
-- **Five hand-written faithfulness clauses, not a 1-10 scale.** A bare number
-  steers a model poorly, and the differences are not quantitative anyway.
-- **Measured, never advertised** — every default traces to a run of `tools/`.
+## History, off by default
 
-## Past generations: undecided
-
-Every request sends **one** reference image, the current sketch — no prior
-render, no stroke history. A placeholder, not a conclusion: history buys
-consistency across rounds, but costs per input image, hits a 14-reference cap
-and makes output path-dependent. Options: [docs/past-generations.md](docs/past-generations.md).
+Off, one reference goes up: the sketch in front of you. **On**, the right pane
+becomes a transcript — sketch and render paired per round — and every *visible*
+message is sent as context, buying consistency and billed per input image. Each
+message hides individually, so that is where you choose what the model sees,
+and hidden state survives a reload. References are downscaled to 768px and
+capped by the model's own limit (16 GPT, 14 Gemini, 8 FLUX). Reasoning:
+[docs/past-generations.md](docs/past-generations.md).
 
 ## Gotchas
 
 Turn **Scribble off** in iPad Settings > Apple Pencil, or Safari drops every
-other `pointerdown`. And **dev is lowered for Safari separately from the
-build**, via `optimizeDeps.rolldownOptions.transform.target` plus deleting
+other `pointerdown`. And **dev is lowered for Safari separately from the build**
+via `optimizeDeps.rolldownOptions.transform.target` plus deleting
 `node_modules/.vite`. The rest: [GOTCHAS.md](GOTCHAS.md).
 
 ## Next
 
-- **Seed, for holding one variable still** — two models support it, so you
-  could change only the style and see only that change.
+- **Seed** — two models support it, so one variable could be held still.
 - **GLM 5.3 Flash cannot render** but reads images, so it could critique a
   sketch or write the prompt. Every GLM on OpenRouter is text-out only.

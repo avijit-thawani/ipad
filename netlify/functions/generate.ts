@@ -16,6 +16,9 @@ const UPSTREAM_TIMEOUT_MS = 50_000;
 /** Netlify caps a buffered request at 6 MB; stop well short of it. */
 const MAX_SKETCH_BYTES = 4 * 1024 * 1024;
 
+/** The same ceiling applied to the sketch plus all of its context images. */
+const MAX_PAYLOAD_BYTES = 5 * 1024 * 1024;
+
 /**
  * Write the sketch, the render and the exact prompt to `renders/` when
  * DEBUG_SAVE_RENDERS is set. The browser keeps only 320px thumbnails, so
@@ -67,6 +70,7 @@ export default async (request: Request): Promise<Response> => {
     effort?: unknown;
     aspect?: unknown;
     adherence?: unknown;
+    history?: unknown;
   };
   try {
     body = (await request.json()) as typeof body;
@@ -112,11 +116,30 @@ export default async (request: Request): Promise<Response> => {
   );
   if (!adherence) return json({ error: 'adherence must be a level from 1 to 5' }, 400);
 
+  // Context images, oldest first, with the current sketch appended last — the
+  // order the prompt's history clause describes. Trimmed to the model's own
+  // cap rather than a guess: the sketch takes one of the slots.
+  const history = Array.isArray(body.history) ? body.history : [];
+  if (history.some((h) => typeof h !== 'string' || !h.startsWith('data:image/'))) {
+    return json({ error: 'history must be image data URLs' }, 400);
+  }
+  const budget = Math.max(0, model.maxReferences - 1);
+  const context = (history as string[]).slice(-budget);
+
+  const bytes = context.reduce((sum, h) => sum + h.length, sketch.length);
+  if (bytes > MAX_PAYLOAD_BYTES) {
+    return json(
+      { error: `too much context: ${Math.round(bytes / 1e6)}MB of images, hide some rounds` },
+      413
+    );
+  }
+
   // Assembled in one place, so this function never decides any wording.
   const prompt = buildPrompt({
     adherence,
     style,
     typed: typeof body.prompt === 'string' ? body.prompt : '',
+    historyCount: context.length,
   });
 
   const startedAt = Date.now();
@@ -134,11 +157,13 @@ export default async (request: Request): Promise<Response> => {
       body: JSON.stringify({
         model: model.id,
         prompt,
-        // Exactly one reference: the sketch in front of you. No previous
-        // render and no stroke history, deliberately — see "Past generations"
-        // in the README. Models accept up to 14, so adding them is easy, and
-        // the open question is whether it helps rather than whether it fits.
-        input_references: [{ type: 'image_url', image_url: { url: sketch } }],
+        // The current sketch goes LAST, because the history clause tells the
+        // model the final image is the one to render. Changing this order
+        // without changing that sentence would silently break both.
+        input_references: [...context, sketch].map((url) => ({
+          type: 'image_url',
+          image_url: { url },
+        })),
         ...(aspect ? { aspect_ratio: aspect } : {}),
         ...effortParams(model, effort),
       }),
@@ -176,6 +201,7 @@ export default async (request: Request): Promise<Response> => {
     effort,
     effortParam: effortParams(model, effort),
     style: style.id,
+    contextImages: context.length,
     adherence: adherence.level,
     adherenceLabel: adherence.label,
     aspect,

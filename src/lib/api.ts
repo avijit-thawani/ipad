@@ -126,6 +126,12 @@ export type GenerateOptions = {
   aspect: string;
   /** 1 (interpret) to 5 (literal), how closely the render follows the drawing. */
   adherence: number;
+  /**
+   * Earlier sketches and renders, oldest first, as context. Empty when the
+   * history toggle is off or everything is hidden, which is the behaviour the
+   * app had before history existed.
+   */
+  history: string[];
 };
 
 /**

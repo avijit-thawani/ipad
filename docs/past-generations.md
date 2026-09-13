@@ -3,11 +3,16 @@
 <!-- One open decision per section. When one is settled, replace the argument
      with the conclusion and why, and keep it short. -->
 
-**Status: undecided. Current behaviour is a placeholder, not a conclusion.**
+**Status: option 2 built — opt-in, off by default.** Strokes remain undecided.
 
-Every request sends exactly one reference image — the sketch in front of you —
-and no previous render, no earlier sketch, and no stroke history. See the
-comment at `input_references` in [`../netlify/functions/generate.ts`](../netlify/functions/generate.ts).
+The History toggle, above the render pane, turns the pane into a transcript and
+sends every *visible* message with the next render. Off, exactly one reference
+goes up — the sketch in front of you — which is what the app did before.
+
+Each message has a hide control. Hidden messages stay on screen but drop out of
+the request, so the transcript is where you choose what the model sees, and the
+choice survives a reload. That is what makes path dependence (below) navigable
+rather than something that just happens to you.
 
 ## What feeding history back would buy
 
@@ -49,14 +54,23 @@ better than just looking at the finished sketch.
 
 ## Options, roughly in order of cost
 
-1. **Nothing** (today). Flat price, no surprises, no consistency across rounds.
-2. **Opt-in "continue from this"** — attach only the render you are looking at,
-   only when you ask. One extra input image, a bounded cost, and path
-   dependence becomes something you chose rather than something that happened.
-3. **Rolling window of N renders**, auto-attached. Real consistency, growing
-   cost, and needs a clear-history control.
-4. **Anything stroke-derived.** Only worth it once 2 or 3 has proved that
-   history helps at all.
+1. **Nothing.** Flat price, no surprises, no consistency across rounds. This is
+   still what you get with the toggle off, and it is the default.
+2. **Opt-in, per-message** — *built*. You choose what goes, message by message.
+3. **Rolling window of N renders**, auto-attached. Not built: option 2 already
+   gives this if you simply leave everything visible, without taking the choice
+   away.
+4. **Anything stroke-derived.** Still open, and still blocked on the same
+   problem: no image model accepts strokes.
 
-Option 2 is the cheapest way to find out whether any of this is worth it, and
-it is the one to build first if the answer matters.
+## How it is bounded
+
+- **References are downscaled to 768px JPEG** before being sent. Netlify caps a
+  buffered request at 6MB, and full-size history would blow that after three or
+  four rounds. At the largest cap this lands around 2.8MB.
+- **The cap is the model's own**, from its `input_references` descriptor: 16 for
+  the GPT Image family, 14 for Gemini, 8 for FLUX. The current sketch takes one
+  slot, so the history budget is that minus one, and when there is more history
+  than budget the *newest* is kept.
+- **The count is displayed**, next to the toggle, because "history on" hides how
+  many images you are paying for.

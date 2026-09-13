@@ -2,7 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { Box, Tldraw, type Editor, type TLUiComponents } from 'tldraw';
 import 'tldraw/tldraw.css';
 import { Unauthorized, clearToken, generate, type Generated } from '../lib/api';
-import { clearTurns, loadTurns, makeTurn, saveTurns, type Turn } from '../lib/history';
+import {
+  clearTurns,
+  contextImages,
+  loadTurns,
+  makeTurn,
+  putTurn,
+  type Turn,
+} from '../lib/history';
 import { clearLastRender, loadLastRender, saveLastRender } from '../lib/lastRender';
 import {
   DEFAULT_MODEL_ID,
@@ -14,6 +21,22 @@ import { DEFAULT_ADHERENCE } from '../../shared/prompts';
 import CanvasTools from '../components/CanvasTools';
 import Progress from '../components/Progress';
 import Settings from '../components/Settings';
+import Transcript from '../components/Transcript';
+
+/**
+ * Whether history is fed back to the model. Persisted because it changes both
+ * what the right pane shows and what a render costs, and having it silently
+ * reset on reload would be a surprise in both directions.
+ */
+const HISTORY_KEY = 'ipad.history';
+
+function loadHistoryOn(): boolean {
+  try {
+    return localStorage.getItem(HISTORY_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Client-side validated and domain-restricted, so shipping it in the bundle is
@@ -71,10 +94,8 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<Generated | null>(null);
-  const [turns, setTurns] = useState<Turn[]>(() => loadTurns());
-  /** A past round being looked at, which shows its thumbnail, not a full render. */
-  const [viewing, setViewing] = useState<Turn | null>(null);
-  const [showHistory, setShowHistory] = useState(false);
+  const [turns, setTurns] = useState<Turn[]>([]);
+  const [historyOn, setHistoryOn] = useState(loadHistoryOn);
 
   const model = findModel(modelId) ?? findModel(DEFAULT_MODEL_ID)!;
 
@@ -90,14 +111,18 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
   const [paneSize, setPaneSize] = useState({ w: 1, h: 1 });
 
   // tldraw restores the sketch from IndexedDB on its own, so without this the
-  // drawing came back after a reload and the render did not.
+  // drawing came back after a reload and the render did not. The transcript
+  // comes from the same place, hidden flags and all.
   useEffect(() => {
     let cancelled = false;
-    loadLastRender().then((cached) => {
-      if (cached && !cancelled) {
+    void (async () => {
+      const [cached, stored] = await Promise.all([loadLastRender(), loadTurns()]);
+      if (cancelled) return;
+      if (cached) {
         setResult({ image: cached.image, model: cached.model, cost: null, elapsedMs: 0 });
       }
-    });
+      setTurns(stored);
+    })();
     return () => {
       cancelled = true;
     };
@@ -121,12 +146,29 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
   }
 
   function forget() {
-    clearTurns();
+    void clearTurns();
     void clearLastRender();
     setTurns([]);
-    setViewing(null);
     setResult(null);
-    setShowHistory(false);
+  }
+
+  /** Hidden messages stay on screen but drop out of the next request. */
+  function toggleHidden(turn: Turn, which: 'sketch' | 'render') {
+    const next: Turn =
+      which === 'sketch'
+        ? { ...turn, sketchHidden: !turn.sketchHidden }
+        : { ...turn, renderHidden: !turn.renderHidden };
+    setTurns((current) => current.map((t) => (t.id === next.id ? next : t)));
+    void putTurn(next);
+  }
+
+  function setHistory(on: boolean) {
+    setHistoryOn(on);
+    try {
+      localStorage.setItem(HISTORY_KEY, on ? '1' : '0');
+    } catch {
+      // The toggle still works for this session if storage is blocked.
+    }
   }
 
   async function onGenerate() {
@@ -139,7 +181,6 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
 
     setBusy(true);
     setError('');
-    setViewing(null);
     try {
       // Export the viewport rather than the shapes' bounding box. Exporting the
       // bounding box would make the sketch whatever shape you happened to draw
@@ -159,6 +200,9 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
         effort,
         aspect,
         adherence,
+        // Empty unless the toggle is on, so the default request is exactly what
+        // it was before history existed. The sketch takes one reference slot.
+        history: historyOn ? contextImages(turns, model.maxReferences - 1) : [],
       });
       setResult(generated);
       void saveLastRender({
@@ -180,12 +224,13 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
           elapsedMs: generated.elapsedMs,
           costUsd: generated.cost,
           sketch: url,
-          result: generated.image,
+          render: generated.image,
         });
-        setTurns(saveTurns([turn, ...turns]));
+        await putTurn(turn);
+        setTurns((current) => [...current, turn]);
       } catch (e) {
         setError(
-          `The render is fine, but saving it to the strip failed: ${
+          `The render is fine, but recording it failed: ${
             e instanceof Error ? e.message : String(e)
           }`
         );
@@ -201,7 +246,8 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
     }
   }
 
-  const shown = viewing ? viewing.resultThumb : result?.image;
+  /** How many past messages the next request would carry, for the toggle. */
+  const contextCount = historyOn ? contextImages(turns, model.maxReferences - 1).length : 0;
 
   return (
     // Three bands: two equal panes across the top, one full-width bar beneath.
@@ -224,29 +270,47 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
               rather than to the next generation, so they sit up here instead
               of taking width in the control bar. */}
           <div className="absolute top-2 right-3 z-10 flex items-center gap-3 text-xs">
-            {turns.length > 0 && (
-              <button
-                onClick={() => setShowHistory(!showHistory)}
-                className="text-base-content/50 underline"
-              >
-                {showHistory ? 'Hide' : `History ${turns.length}`}
-              </button>
-            )}
-            {result && !viewing && (
+            {/* Both a view switch and a cost switch: on, the pane becomes the
+                transcript and every visible message is sent with the next
+                render — which is billed per input image. The count is the
+                honest version of "history on". */}
+            <label className="flex items-center gap-1.5 text-base-content/55">
+              <input
+                type="checkbox"
+                checked={historyOn}
+                onChange={(e) => setHistory(e.target.checked)}
+                className="checkbox checkbox-xs"
+              />
+              History{historyOn && turns.length > 0 ? ` · ${contextCount} sent` : ''}
+            </label>
+
+            {result && (
               <a href={result.image} download="render.png" className="link text-base-content/50">
                 Save
               </a>
+            )}
+            {turns.length > 0 && (
+              <button onClick={forget} className="link text-base-content/30">
+                Clear
+              </button>
             )}
             <button onClick={signOut} className="link text-base-content/30">
               Log out
             </button>
           </div>
 
-          {busy ? (
+          {historyOn ? (
+            <Transcript
+              turns={turns}
+              onToggle={toggleHidden}
+              busy={busy}
+              liveRender={<Progress boundSeconds={model.measuredSeconds} />}
+            />
+          ) : busy ? (
             <Progress boundSeconds={model.measuredSeconds} />
-          ) : shown ? (
+          ) : result ? (
             <img
-              src={shown}
+              src={result.image}
               alt="Generated render"
               className="max-w-full max-h-full object-contain animate-pop-in"
             />
@@ -305,28 +369,9 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
           </div>
         </div>
 
-        {showHistory && turns.length > 0 && (
-          <div className="flex gap-1.5 items-center overflow-x-auto overflow-y-hidden pb-1">
-            {turns.map((turn) => (
-              <button
-                key={turn.id}
-                onClick={() => setViewing(turn)}
-                title={`${turn.model} · ${turn.style} · ${turn.adherence} · ${(
-                  turn.elapsedMs / 1000
-                ).toFixed(1)}s`}
-                className={`shrink-0 rounded-field overflow-hidden border-2 transition-colors ${
-                  viewing?.id === turn.id ? 'border-primary' : 'border-base-content/10'
-                }`}
-              >
-                <img src={turn.resultThumb} alt={turn.prompt} className="w-10 h-10 object-cover" />
-              </button>
-            ))}
-            <button onClick={forget} className="link text-xs text-base-content/40 shrink-0 ml-1">
-              Forget all
-            </button>
-          </div>
-        )}
-
+        {/* The thumbnail strip that used to live here is gone: the transcript
+            in the right pane does the same job better, and the strip grew
+            under the bar as the session went on. */}
         {error && <p className="text-error text-xs truncate">{error}</p>}
       </div>
     </div>

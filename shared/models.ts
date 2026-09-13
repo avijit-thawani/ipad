@@ -70,6 +70,13 @@ export type ModelSpec = {
    * shipped as a trap — but it is kept as the guard for anything added later.
    */
   exceedsCap: boolean;
+  /**
+   * Total `input_references` this model accepts, from its
+   * `supported_parameters` descriptor — the current sketch counts as one, so
+   * the history budget is this minus one. Verified Sept 2026: 16 for the GPT
+   * Image family, 14 for Gemini, 8 for FLUX.
+   */
+  maxReferences: number;
 };
 
 export const EFFORT_LABELS = ['Draft', 'Normal', 'High', 'Max'] as const;
@@ -91,6 +98,7 @@ export const MODELS: ModelSpec[] = [
     supportsSeed: false,
     measuredSeconds: 8.8,
     measuredUsd: 0.0454,
+    maxReferences: 14,
     exceedsCap: false,
     slowAtHighEffort: false,
   },
@@ -106,6 +114,7 @@ export const MODELS: ModelSpec[] = [
     supportsSeed: false,
     measuredSeconds: 6.4,
     measuredUsd: 0.0339,
+    maxReferences: 14,
     exceedsCap: false,
     slowAtHighEffort: false,
   },
@@ -121,6 +130,7 @@ export const MODELS: ModelSpec[] = [
     supportsSeed: false,
     measuredSeconds: 23.5,
     measuredUsd: 0.1357,
+    maxReferences: 14,
     exceedsCap: false,
     slowAtHighEffort: false,
   },
@@ -136,6 +146,7 @@ export const MODELS: ModelSpec[] = [
     supportsSeed: false,
     measuredSeconds: 19.6,
     measuredUsd: 0.0185,
+    maxReferences: 16,
     exceedsCap: false,
     slowAtHighEffort: true,
   },
@@ -151,6 +162,7 @@ export const MODELS: ModelSpec[] = [
     supportsSeed: false,
     measuredSeconds: 14.1,
     measuredUsd: 0.0185,
+    maxReferences: 16,
     exceedsCap: false,
     slowAtHighEffort: true,
   },
@@ -166,6 +178,7 @@ export const MODELS: ModelSpec[] = [
     supportsSeed: false,
     measuredSeconds: 14.4,
     measuredUsd: 0.0184,
+    maxReferences: 16,
     exceedsCap: false,
     slowAtHighEffort: true,
   },
@@ -181,6 +194,7 @@ export const MODELS: ModelSpec[] = [
     supportsSeed: true,
     measuredSeconds: 14.0,
     measuredUsd: 0.06,
+    maxReferences: 8,
     exceedsCap: false,
     slowAtHighEffort: false,
   },

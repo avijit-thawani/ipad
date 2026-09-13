@@ -24,10 +24,14 @@
  * hardcoded here as "keep the arrangement, proportions and placement", which
  * pinned every render near maximum adherence and would now contradict the
  * looser settings. ADHERENCE is the only voice on that.
+ *
+ * Also deliberately silent on how many images are attached. It said "the
+ * reference image is…", which was a lie as soon as history could be sent;
+ * `historyClause` is what names the current sketch among several.
  */
 export const PREAMBLE =
-  'The reference image is a rough hand-drawn sketch. Render it as a finished ' +
-  'image rather than copying the pencil strokes, and ignore stray marks.';
+  'You are given a rough hand-drawn sketch. Render it as a finished image ' +
+  'rather than copying the pencil strokes, and ignore stray marks.';
 
 /** Used when you typed nothing and picked no style, so something must be said. */
 export const FALLBACK_PROMPT =
@@ -155,17 +159,42 @@ export function findStyle(id: string): StyleSpec | undefined {
 }
 
 /**
+ * Said only when earlier images are attached. Without it the model has no way
+ * to tell which of several references is the thing to draw, and treats the lot
+ * as one composition — pasting old renders into the new image.
+ *
+ * `count` is how many earlier images precede the current sketch, so the
+ * sentence can name the position rather than rely on the model inferring it.
+ */
+export function historyClause(count: number): string {
+  if (count < 1) return '';
+  return (
+    `The LAST of the ${count + 1} reference images is the current sketch, and ` +
+    'the only thing to render. The earlier images are previous sketches from ' +
+    'this session and the renders they produced, given purely as context for ' +
+    'consistency of subject, character, palette and style. Do not copy them, ' +
+    'do not combine them into the new image, and do not treat anything in them ' +
+    'as part of the current composition.'
+  );
+}
+
+/**
  * Assemble the whole thing. Each part is terminated before joining, because a
  * typed fragment like "a hilltop cottage" otherwise runs into the clause
  * beside it and reads as a continuation of that sentence.
+ *
+ * `historyCount` defaults to 0, which is the no-context case and produces
+ * exactly the prompt this app sent before history existed.
  */
 export function buildPrompt(parts: {
   adherence: AdherenceSpec;
   style: StyleSpec;
   typed: string;
+  historyCount?: number;
 }): string {
   const typed = parts.typed.trim();
   const body = [
+    historyClause(parts.historyCount ?? 0),
     parts.adherence.clause,
     typed || (parts.style.clause ? '' : FALLBACK_PROMPT),
     parts.style.clause,
