@@ -50,20 +50,19 @@ the function is where the money is. No test framework, matching the siblings.
 
 ## Status
 
-Built: password gate, canvas with IndexedDB persistence, PNG export, one round
-of sketch + prompt to a render, a session strip of past rounds. Auth, payload
-validation and upstream error passthrough are verified by curl; the login
-screen renders on the iPad.
+**It works end to end**: sketched on the iPad, one tap, a render came back.
+That is the whole premise proved. Auth, payload validation and upstream error
+passthrough are verified by curl. Still unconfirmed on hardware: whether stroke
+width tracks Pencil pressure, and whether Scribble drops taps — those notes are
+from the literature. Not built: iterating on a previous round, AI strokes
+returning to the canvas, server-side storage.
 
-**Nothing has been drawn with an actual Pencil yet**, so the pressure and
-Scribble notes below come from the literature rather than from use, and no
-generated image has ever been produced. Not built: iterating on a previous
-round, AI strokes returning to the canvas, server-side storage.
-
-Because the device has no reachable console, failures print themselves onto the
-page — an `ErrorBoundary`, plus an ES5 handler in `index.html` that is
-deliberately not a module so it survives a syntax error in the bundle. Both end
-with the user agent, which is what identifies a Safari too old for something.
+`DEBUG_SAVE_RENDERS=1` writes every sketch, render and prompt to `renders/`
+(gitignored) — the only way to compare what a prompt change did, since the
+browser keeps just 320px thumbnails. And because the device has no reachable
+console, failures print themselves onto the page via an `ErrorBoundary` plus an
+ES5 handler in `index.html`, deliberately not a module so it survives a syntax
+error in the bundle. Both end with the user agent.
 
 ## Gotchas
 

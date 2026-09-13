@@ -27,6 +27,30 @@ const FALLBACK_PROMPT =
   'Render the sketch as a detailed, well-lit illustration, choosing a style ' +
   'that suits the subject.';
 
+/**
+ * Write the sketch, the render and the exact prompt to `renders/` when
+ * DEBUG_SAVE_RENDERS is set. The browser keeps only 320px thumbnails, so
+ * without this there is no way to compare what a prompt change actually did to
+ * the output. Local dev only: Netlify's filesystem is read-only apart from
+ * /tmp, so a failure here is ignored rather than allowed to lose a paid render.
+ */
+async function saveForDebugging(sketch: string, b64: string, prompt: string): Promise<void> {
+  if (!process.env.DEBUG_SAVE_RENDERS) return;
+  try {
+    const { mkdir, writeFile } = await import('node:fs/promises');
+    const dir = 'renders';
+    await mkdir(dir, { recursive: true });
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const base = `${dir}/${stamp}`;
+    const sketchB64 = sketch.slice(sketch.indexOf(',') + 1);
+    await writeFile(`${base}-sketch.png`, Buffer.from(sketchB64, 'base64'));
+    await writeFile(`${base}-render.png`, Buffer.from(b64, 'base64'));
+    await writeFile(`${base}-prompt.txt`, prompt);
+  } catch {
+    // Never fail a generation over a debug artefact.
+  }
+}
+
 export default async (request: Request): Promise<Response> => {
   const unauthorized = requireAuth(request);
   if (unauthorized) return unauthorized;
@@ -95,6 +119,8 @@ export default async (request: Request): Promise<Response> => {
   if (!image?.b64_json) {
     return json({ error: 'the model returned no image' }, 502);
   }
+
+  await saveForDebugging(sketch, image.b64_json, asked);
 
   return json({
     image: `data:${image.media_type ?? 'image/png'};base64,${image.b64_json}`,

@@ -12,6 +12,21 @@ const TURNS_KEY = 'ipad.turns';
 const MAX_TURNS = 24;
 const THUMB_PX = 320;
 
+/**
+ * `crypto.randomUUID` exists only in a secure context, and dev over the LAN is
+ * plain HTTP, so on the iPad it is undefined — which threw *after* the render
+ * had been displayed and before it could be recorded, losing the round.
+ * `getRandomValues` has no such restriction, and this id only has to be unique
+ * within one browser's history.
+ */
+function newId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const bytes = crypto.getRandomValues(new Uint8Array(8));
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 export type Turn = {
   id: string;
   prompt: string;
@@ -43,6 +58,23 @@ export async function thumbnail(dataUrl: string): Promise<string> {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
   return canvas.toDataURL('image/jpeg', 0.7);
+}
+
+/** Build a turn record, so callers never have to think about id generation. */
+export async function makeTurn(
+  fields: Omit<Turn, 'id' | 'at' | 'sketchThumb' | 'resultThumb'> & {
+    sketch: string;
+    result: string;
+  }
+): Promise<Turn> {
+  const { sketch, result, ...rest } = fields;
+  return {
+    ...rest,
+    id: newId(),
+    at: new Date().toISOString(),
+    sketchThumb: await thumbnail(sketch),
+    resultThumb: await thumbnail(result),
+  };
 }
 
 export function loadTurns(): Turn[] {
