@@ -41,7 +41,9 @@ Then open `http://<mac-lan-ip>:5173` **on the iPad** — Vite prints the address
 as `Network:`. Pointer events need no secure context, so plain HTTP over wifi
 gives genuine Pencil input with hot reload. This matters more than it sounds:
 the Mac cannot test the only input device the app has, and a Netlify deploy per
-change is a miserable way to find out a stroke feels wrong.
+change is a miserable way to find out a stroke feels wrong. macOS will prompt
+to allow incoming connections for `node` the first time; if it was dismissed,
+the iPad hangs with no error and the firewall is the reason.
 
 `npm run build` is the gate — `tsc -b` covers the app *and* the functions, since
 the function is where the money is. No test framework, matching the siblings.
@@ -62,12 +64,11 @@ canvas, any server-side storage.
 
 ## Gotchas
 
-- **Scribble eats every other `pointerdown`.** A long-standing Safari bug, not a
-  tldraw one: tap twice quickly with the Pencil and the second is dropped. Fix
-  is iPad Settings > Apple Pencil > Scribble, off. There is a known
-  `preventDefault` on `touchmove` workaround, deliberately not applied here
-  because it also kills two-finger pan — reach for it only if the settings
-  change is not enough.
+- **Scribble eats every other `pointerdown`.** A long-standing Safari bug, not
+  a tldraw one: tap twice quickly and the second tap is dropped. Fix is iPad
+  Settings > Apple Pencil > Scribble, off. The known `preventDefault` on
+  `touchmove` workaround is deliberately not applied here because it also kills
+  two-finger pan.
 - **Safari still has no `getCoalescedEvents()`.** The Pencil samples at 240 Hz,
   you see one sample per frame, so fast strokes come out as chords. Turn off
   Settings > Safari > *Prefer Page Rendering Updates near 60fps* and keep Low
