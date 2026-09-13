@@ -3,6 +3,7 @@ import { Box, Tldraw, type Editor, type TLUiComponents } from 'tldraw';
 import 'tldraw/tldraw.css';
 import { Unauthorized, clearToken, generate, type Generated } from '../lib/api';
 import { clearTurns, loadTurns, makeTurn, saveTurns, type Turn } from '../lib/history';
+import { clearLastRender, loadLastRender, saveLastRender } from '../lib/lastRender';
 import {
   DEFAULT_MODEL_ID,
   findModel,
@@ -54,7 +55,10 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
    */
   const [editor, setEditor] = useState<Editor | null>(null);
 
-  const [prompt, setPrompt] = useState('');
+  // Empty while the free-text box is commented out below. Still sent with every
+  // request, so restoring the box means changing this back to useState('') and
+  // uncommenting the input — nothing else.
+  const prompt = '';
   const [modelId, setModelId] = useState(DEFAULT_MODEL_ID);
   const [style, setStyle] = useState('none');
   // Lowest by default: it is the cheapest and fastest, and on a resolution-axis
@@ -70,6 +74,7 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
   const [turns, setTurns] = useState<Turn[]>(() => loadTurns());
   /** A past round being looked at, which shows its thumbnail, not a full render. */
   const [viewing, setViewing] = useState<Turn | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
 
   const model = findModel(modelId) ?? findModel(DEFAULT_MODEL_ID)!;
 
@@ -83,6 +88,20 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
    * for; rotating the iPad has to update it.
    */
   const [paneSize, setPaneSize] = useState({ w: 1, h: 1 });
+
+  // tldraw restores the sketch from IndexedDB on its own, so without this the
+  // drawing came back after a reload and the render did not.
+  useEffect(() => {
+    let cancelled = false;
+    loadLastRender().then((cached) => {
+      if (cached && !cancelled) {
+        setResult({ image: cached.image, model: cached.model, cost: null, elapsedMs: 0 });
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const pane = canvasPaneRef.current;
@@ -103,9 +122,11 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
 
   function forget() {
     clearTurns();
+    void clearLastRender();
     setTurns([]);
     setViewing(null);
     setResult(null);
+    setShowHistory(false);
   }
 
   async function onGenerate() {
@@ -140,6 +161,11 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
         adherence,
       });
       setResult(generated);
+      void saveLastRender({
+        image: generated.image,
+        model: generated.model,
+        at: new Date().toISOString(),
+      });
 
       // Recording the round must not be able to lose it: the render is already
       // on screen by now, so a failure here is reported without discarding it.
@@ -224,15 +250,22 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
           aspect={aspect}
         />
 
+        {/* A free-text box is commented out rather than deleted: the style and
+            adherence dropdowns cover everything so far, and an empty textbox
+            was only inviting work. `prompt` is still threaded through the
+            request, so restoring this is one JSX block and nothing else.
+
+        <input
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          placeholder="What should it become?"
+          className="flex-1 min-w-0 rounded-field bg-base-100 border-2 border-base-content/15
+                     focus:border-primary/60 focus:outline-none px-3 py-2
+                     placeholder:text-base-content/35 transition-colors"
+        />
+        */}
+
         <div className="flex items-center gap-2">
-          <input
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="What should it become? (a style button alone is enough)"
-            className="flex-1 min-w-0 rounded-field bg-base-100 border-2 border-base-content/15
-                       focus:border-primary/60 focus:outline-none px-3 py-2
-                       placeholder:text-base-content/35 transition-colors"
-          />
           <button
             onClick={onGenerate}
             disabled={busy}
@@ -241,45 +274,52 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
             {busy ? 'Drawing…' : 'Generate'}
           </button>
 
+          {/* Collapsed by default. Growing inline is what squeezed everything
+              else in this row as the session went on. */}
           {turns.length > 0 && (
-            <div className="flex gap-1.5 items-center shrink-0 max-w-[34%] overflow-x-auto overflow-y-hidden">
-              {turns.map((turn) => (
-                <button
-                  key={turn.id}
-                  onClick={() => {
-                    setViewing(turn);
-                    setPrompt(turn.prompt);
-                  }}
-                  title={`${turn.prompt || '(no prompt)'} — ${turn.model} · ${(
-                    turn.elapsedMs / 1000
-                  ).toFixed(1)}s`}
-                  className={`shrink-0 rounded-field overflow-hidden border-2 transition-colors ${
-                    viewing?.id === turn.id ? 'border-primary' : 'border-base-content/10'
-                  }`}
-                >
-                  <img src={turn.resultThumb} alt={turn.prompt} className="w-9 h-9 object-cover" />
-                </button>
-              ))}
-              <button onClick={forget} className="link text-xs text-base-content/40 shrink-0">
-                Forget
-              </button>
-            </div>
+            <button
+              onClick={() => setShowHistory(!showHistory)}
+              className="btn btn-ghost btn-sm rounded-field text-xs text-base-content/60 shrink-0"
+            >
+              {showHistory ? 'Hide' : 'Past'} {turns.length}
+            </button>
           )}
+
+          <span className="flex-1" />
+
+          {result && !viewing && (
+            <a href={result.image} download="render.png" className="link text-xs shrink-0">
+              Download
+            </a>
+          )}
+          <button onClick={signOut} className="link text-xs text-base-content/40 shrink-0">
+            Sign out
+          </button>
         </div>
 
-        <div className="flex items-center justify-between gap-3 text-xs">
-          <span className="text-error truncate">{error}</span>
-          <span className="text-base-content/50 shrink-0 flex gap-3 items-center">
-            {result && !viewing && (
-              <a href={result.image} download="render.png" className="link">
-                Download
-              </a>
-            )}
-            <button onClick={signOut} className="link">
-              Sign out
+        {showHistory && turns.length > 0 && (
+          <div className="flex gap-1.5 items-center overflow-x-auto overflow-y-hidden pb-1">
+            {turns.map((turn) => (
+              <button
+                key={turn.id}
+                onClick={() => setViewing(turn)}
+                title={`${turn.model} · ${turn.style} · ${turn.adherence} · ${(
+                  turn.elapsedMs / 1000
+                ).toFixed(1)}s`}
+                className={`shrink-0 rounded-field overflow-hidden border-2 transition-colors ${
+                  viewing?.id === turn.id ? 'border-primary' : 'border-base-content/10'
+                }`}
+              >
+                <img src={turn.resultThumb} alt={turn.prompt} className="w-10 h-10 object-cover" />
+              </button>
+            ))}
+            <button onClick={forget} className="link text-xs text-base-content/40 shrink-0 ml-1">
+              Forget all
             </button>
-          </span>
-        </div>
+          </div>
+        )}
+
+        {error && <p className="text-error text-xs truncate">{error}</p>}
       </div>
     </div>
   );

@@ -134,6 +134,10 @@ export default async (request: Request): Promise<Response> => {
       body: JSON.stringify({
         model: model.id,
         prompt,
+        // Exactly one reference: the sketch in front of you. No previous
+        // render and no stroke history, deliberately — see "Past generations"
+        // in the README. Models accept up to 14, so adding them is easy, and
+        // the open question is whether it helps rather than whether it fits.
         input_references: [{ type: 'image_url', image_url: { url: sketch } }],
         ...(aspect ? { aspect_ratio: aspect } : {}),
         ...effortParams(model, effort),

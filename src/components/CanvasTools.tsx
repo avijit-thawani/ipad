@@ -3,21 +3,20 @@ import { DefaultColorStyle, DefaultSizeStyle, type Editor } from 'tldraw';
 
 /**
  * tldraw's own toolbar and style panel are hidden (see HIDDEN_UI in DrawPage)
- * and replaced by this, so the canvas is nothing but drawing surface and every
- * control lives in one bar along the bottom.
+ * and replaced by this, so the canvas is nothing but drawing surface.
  *
  * It sits outside the `Tldraw` component, so `useEditor` is unavailable and the
- * editor is driven imperatively through a ref. Selection state is mirrored in
+ * editor is driven imperatively through a prop. Selection state is mirrored in
  * React rather than read back from the editor, which is fine because this is
  * the only thing that sets it.
+ *
+ * Colour and width are `select` elements rather than rows of buttons: twelve
+ * swatches and four sizes were most of the clutter in the bar, and a native
+ * select on iPadOS opens as a full-size picker, which is a better touch target
+ * than anything hand-rolled.
  */
 
-/**
- * Pen and eraser only, deliberately. Shapes and select were clutter on a
- * surface whose whole point is freehand; tldraw still has them if they are
- * ever wanted back. `draw` is the tool tldraw starts in, so the initial
- * highlight is already correct without setting anything.
- */
+/** Pen and eraser only. tldraw starts in `draw`, so the initial state is right. */
 const TOOLS = [
   { id: 'draw', label: 'Pen' },
   { id: 'eraser', label: 'Eraser' },
@@ -25,42 +24,37 @@ const TOOLS = [
 
 /** tldraw's palette, minus white, which is invisible on a white canvas. */
 const COLORS = [
-  'black',
-  'grey',
-  'blue',
-  'light-blue',
-  'green',
-  'light-green',
-  'yellow',
-  'orange',
-  'red',
-  'light-red',
-  'violet',
-  'light-violet',
+  ['black', 'Black', '#1d1d1d'],
+  ['grey', 'Grey', '#9fa8b2'],
+  ['blue', 'Blue', '#4263eb'],
+  ['light-blue', 'Light blue', '#4dabf7'],
+  ['green', 'Green', '#099268'],
+  ['light-green', 'Light green', '#40c057'],
+  ['yellow', 'Yellow', '#f1ac4b'],
+  ['orange', 'Orange', '#e16919'],
+  ['red', 'Red', '#e03131'],
+  ['light-red', 'Light red', '#ff8787'],
+  ['violet', 'Violet', '#ae3ec9'],
+  ['light-violet', 'Light violet', '#e599f7'],
 ] as const;
 
 const SIZES = [
-  { id: 's', label: 'S' },
-  { id: 'm', label: 'M' },
-  { id: 'l', label: 'L' },
-  { id: 'xl', label: 'XL' },
+  ['s', 'Thin'],
+  ['m', 'Medium'],
+  ['l', 'Thick'],
+  ['xl', 'Heavy'],
 ] as const;
 
-/** Swatch fills. tldraw's palette is not exposed as plain CSS, so approximate. */
-const SWATCH: Record<string, string> = {
-  black: '#1d1d1d',
-  grey: '#9fa8b2',
-  blue: '#4263eb',
-  'light-blue': '#4dabf7',
-  green: '#099268',
-  'light-green': '#40c057',
-  yellow: '#f1ac4b',
-  orange: '#e16919',
-  red: '#e03131',
-  'light-red': '#ff8787',
-  violet: '#ae3ec9',
-  'light-violet': '#e599f7',
-};
+const chip = (active: boolean) =>
+  `px-2.5 py-1 rounded-field text-xs font-medium border transition-colors ${
+    active
+      ? 'bg-base-content text-base-100 border-base-content'
+      : 'bg-base-100 border-base-content/15 text-base-content/70'
+  }`;
+
+const select =
+  'rounded-field bg-base-100 border-2 border-base-content/15 px-2 py-1 text-xs ' +
+  'focus:border-primary/60 focus:outline-none';
 
 export default function CanvasTools({ editor }: { editor: Editor | null }) {
   const [tool, setTool] = useState<string>('draw');
@@ -86,15 +80,10 @@ export default function CanvasTools({ editor }: { editor: Editor | null }) {
     editor.setStyleForNextShapes(DefaultSizeStyle, next as 'm');
   }
 
-  const chip = (active: boolean) =>
-    `px-2.5 py-1 rounded-field text-xs font-medium border transition-colors ${
-      active
-        ? 'bg-base-content text-base-100 border-base-content'
-        : 'bg-base-100 border-base-content/15 text-base-content/70'
-    }`;
+  const swatch = COLORS.find(([id]) => id === color)?.[2] ?? '#1d1d1d';
 
   return (
-    <div className="flex items-center gap-3 flex-wrap">
+    <div className="flex items-center gap-2 flex-wrap">
       <div className="flex gap-1">
         {TOOLS.map((t) => (
           <button key={t.id} onClick={() => pickTool(t.id)} className={chip(tool === t.id)}>
@@ -103,28 +92,40 @@ export default function CanvasTools({ editor }: { editor: Editor | null }) {
         ))}
       </div>
 
-      <div className="flex gap-1 items-center">
-        {COLORS.map((c) => (
-          <button
-            key={c}
-            onClick={() => pickColor(c)}
-            aria-label={c}
-            title={c}
-            style={{ background: SWATCH[c] }}
-            className={`w-6 h-6 rounded-full border-2 transition-transform ${
-              color === c ? 'border-base-content scale-115' : 'border-base-content/20'
-            }`}
-          />
-        ))}
+      <div className="flex items-center gap-1.5">
+        {/* The swatch is the only way to see the current colour at a glance,
+            since a select shows its value as text. */}
+        <span
+          aria-hidden
+          style={{ background: swatch }}
+          className="w-5 h-5 rounded-full border-2 border-base-content/20 shrink-0"
+        />
+        <select
+          value={color}
+          onChange={(e) => pickColor(e.target.value)}
+          aria-label="Stroke colour"
+          className={select}
+        >
+          {COLORS.map(([id, label]) => (
+            <option key={id} value={id}>
+              {label}
+            </option>
+          ))}
+        </select>
       </div>
 
-      <div className="flex gap-1">
-        {SIZES.map((s) => (
-          <button key={s.id} onClick={() => pickSize(s.id)} className={chip(size === s.id)}>
-            {s.label}
-          </button>
+      <select
+        value={size}
+        onChange={(e) => pickSize(e.target.value)}
+        aria-label="Stroke width"
+        className={select}
+      >
+        {SIZES.map(([id, label]) => (
+          <option key={id} value={id}>
+            {label}
+          </option>
         ))}
-      </div>
+      </select>
 
       <div className="flex gap-1">
         <button onClick={() => editor?.undo()} className={chip(false)}>

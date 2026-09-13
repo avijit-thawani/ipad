@@ -1,5 +1,5 @@
 import { EFFORT_LABELS, MODELS, type EffortLevel, type ModelSpec } from '../../shared/models';
-import { ADHERENCE, STYLES, findAdherence } from '../../shared/prompts';
+import { ADHERENCE, STYLES, findAdherence, findStyle } from '../../shared/prompts';
 
 /**
  * The four control axes, which are orthogonal in the interface but not in the
@@ -43,29 +43,26 @@ export default function Settings({
   onAdherence: (level: number) => void;
   aspect: string;
 }) {
-  const chip = (active: boolean) =>
-    `px-2.5 py-1 rounded-field text-xs font-medium border transition-colors ${
-      active
-        ? 'bg-primary text-primary-content border-primary'
-        : 'bg-base-100 border-base-content/15 text-base-content/70'
-    }`;
-
   return (
     // gap-x-4 with wrapping, and no fixed-width children: the readout used to
     // be a fixed w-24 with nowrap text, which ran under the next control.
     <div className="flex items-center gap-x-4 gap-y-2 flex-wrap">
-      <div className="flex gap-1 items-center">
+      {/* A dropdown rather than seven buttons: the styles were most of the
+          width of this row, and only one is ever active. */}
+      <select
+        value={style}
+        onChange={(e) => onStyle(e.target.value)}
+        aria-label="Render style"
+        title={findStyle(style)?.clause || 'No style clause; describe it yourself'}
+        className="rounded-field bg-base-100 border-2 border-base-content/15 px-2 py-1 text-xs
+                   focus:border-primary/60 focus:outline-none"
+      >
         {STYLES.map((s) => (
-          <button
-            key={s.id}
-            onClick={() => onStyle(s.id)}
-            title={s.clause || 'No style clause; describe it yourself'}
-            className={chip(style === s.id)}
-          >
+          <option key={s.id} value={s.id}>
             {s.label}
-          </button>
+          </option>
         ))}
-      </div>
+      </select>
 
       <select
         value={model.id}
