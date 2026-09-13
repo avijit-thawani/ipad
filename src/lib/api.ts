@@ -3,12 +3,25 @@ const BASE = '/.netlify/functions';
 
 export class Unauthorized extends Error {}
 
+/**
+ * Safari throws on any localStorage access when cookies are blocked or the tab
+ * is private, and this one runs during the first render — unguarded it takes
+ * the whole app down to a white screen before anything paints.
+ */
 export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
 }
 
 export function clearToken(): void {
-  localStorage.removeItem(TOKEN_KEY);
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    // Nothing to clear if storage was never readable.
+  }
 }
 
 export async function login(password: string): Promise<void> {
@@ -19,7 +32,11 @@ export async function login(password: string): Promise<void> {
   });
   if (!response.ok) throw new Error('That password is wrong.');
   const { token } = await response.json();
-  localStorage.setItem(TOKEN_KEY, token);
+  try {
+    localStorage.setItem(TOKEN_KEY, token);
+  } catch {
+    throw new Error('Enable cookies for this site — the session cannot be saved.');
+  }
 }
 
 async function call<T>(path: string, init: RequestInit = {}): Promise<T> {

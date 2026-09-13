@@ -17,6 +17,62 @@
   </head>
   <body>
     <div id="root"></div>
+
+    <!-- The iPad is the only real test device and it has no reachable console,
+         so a failure that stops the module graph loading shows as a blank white
+         page and nothing else. This paints the error onto the page instead.
+         Deliberately ES5 with no modules: it has to survive the exact syntax
+         error it exists to report. -->
+    <script>
+      (function () {
+        var shown = false;
+        function report(title, detail) {
+          if (shown) return;
+          shown = true;
+          var root = document.getElementById('root');
+          if (!root) return;
+          root.innerHTML =
+            '<div style="font:13px/1.5 ui-monospace,Menlo,monospace;padding:20px;' +
+            'color:#3a2318;background:#faf7f2;height:100%;overflow:auto;' +
+            '-webkit-overflow-scrolling:touch;box-sizing:border-box">' +
+            '<strong style="font-size:15px">' + title + '</strong>' +
+            '<pre style="white-space:pre-wrap;word-break:break-word;margin:12px 0">' +
+            detail +
+            '</pre><hr style="border:none;border-top:1px solid #0002"><pre ' +
+            'style="white-space:pre-wrap;word-break:break-word;color:#0008">' +
+            navigator.userAgent +
+            '</pre></div>';
+        }
+
+        window.addEventListener('error', function (event) {
+          var m = event.message || 'unknown error';
+          if (event.filename) m += '\n\nat ' + event.filename + ':' + event.lineno + ':' + event.colno;
+          if (event.error && event.error.stack) m += '\n\n' + event.error.stack;
+          report('Script error', m);
+        });
+
+        window.addEventListener('unhandledrejection', function (event) {
+          var r = event.reason;
+          report('Unhandled rejection', (r && (r.stack || r.message)) || String(r));
+        });
+
+        // A module that fails to parse fires no error in some Safari versions;
+        // it simply never runs. If nothing has mounted by now, say so and dump
+        // the UA, which is what identifies an unsupported-syntax problem.
+        setTimeout(function () {
+          var root = document.getElementById('root');
+          if (root && root.childElementCount === 0) {
+            report(
+              'The app never mounted',
+              'No error was reported, which usually means a module failed to ' +
+                'parse because this Safari does not support some syntax in it. ' +
+                'The user agent below identifies the version.'
+            );
+          }
+        }, 8000);
+      })();
+    </script>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
