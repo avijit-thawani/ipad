@@ -71,10 +71,10 @@ render returns the same shape as the space you drew in.
 | **Model** | Completely — just a slug. |
 | **Effort** | Not underneath. No image model has a reasoning-effort concept; `quality` (9 of 52) and `resolution` (19) are different parameters. One slider mapped per model, disabled where neither exists. |
 
-Aspect ratio is derived, not chosen. Picker prices are estimates because most
-models bill per output token, so cost climbs with effort; the real figure
-arrives in `usage.cost`, and the bar shows measured time and cost per model
-because OpenRouter publishes no latency for image models at all.
+Aspect ratio is derived, not chosen. The picker shows **measured** cost and
+seconds from `tools/compare-models.ts --yes`, which renders one sketch through
+every model in parallel — OpenRouter publishes no latency and bills most models
+per output token, so advertised figures were wrong by up to 7x.
 
 ## Gotchas
 

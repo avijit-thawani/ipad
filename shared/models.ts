@@ -58,7 +58,9 @@ export type ModelSpec = {
   measuredUsd: number;
   /**
    * True when even the *lowest* effort blew the 50s budget, which makes the
-   * model unusable from this app however you set the slider.
+   * model unusable from this app however you set the slider. No catalog entry
+   * sets it today — Seedream 5 Pro measured 94.5s and was removed rather than
+   * shipped as a trap — but it is kept as the guard for anything added later.
    */
   exceedsCap: boolean;
 };
@@ -73,7 +75,7 @@ export const MODELS: ModelSpec[] = [
   {
     id: 'google/gemini-3.1-flash-image',
     label: 'Nano Banana 2',
-    blurb: 'the default; best all-round quality for the price',
+    blurb: 'more resolution headroom than Lite, but Draft means a literal 512px',
     priceUsd: 0.067,
     priceNote: '$0.00006 per output token',
     effortAxis: 'resolution',
@@ -88,7 +90,7 @@ export const MODELS: ModelSpec[] = [
   {
     id: 'google/gemini-3.1-flash-lite-image',
     label: 'Nano Banana 2 Lite',
-    blurb: 'half the price and ~2.7x faster; 1K only, so effort does nothing',
+    blurb: 'the default: fastest measured at 6.4s, and 1K regardless of effort',
     priceUsd: 0.034,
     priceNote: '$0.00003 per output token',
     effortAxis: null,
@@ -161,21 +163,6 @@ export const MODELS: ModelSpec[] = [
     slowAtHighEffort: true,
   },
   {
-    id: 'bytedance-seed/seedream-5-0-pro',
-    label: 'Seedream 5 Pro',
-    blurb: 'flat price per image, and the widest choice of shapes',
-    priceUsd: 0.045,
-    priceNote: '$0.045 per image, flat',
-    effortAxis: 'resolution',
-    effortStops: ['1K', '1K', '2K', '2K'],
-    aspectRatios: ['1:1', '1:2', '2:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'],
-    supportsSeed: true,
-    measuredSeconds: 94.5,
-    measuredUsd: 0.045,
-    exceedsCap: true,
-    slowAtHighEffort: false,
-  },
-  {
     id: 'black-forest-labs/flux.2-pro',
     label: 'FLUX.2 Pro',
     blurb: 'billed per megapixel; no effort dial, but takes a seed',
@@ -192,7 +179,7 @@ export const MODELS: ModelSpec[] = [
   },
 ];
 
-export const DEFAULT_MODEL_ID = 'google/gemini-3.1-flash-image';
+export const DEFAULT_MODEL_ID = 'google/gemini-3.1-flash-lite-image';
 
 export function findModel(id: string): ModelSpec | undefined {
   return MODELS.find((m) => m.id === id);

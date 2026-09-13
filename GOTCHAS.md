@@ -76,6 +76,17 @@ Each of these cost a debugging round. Verified Sept 2026, iPad + Pencil 1.
 - **`meta/muse-image` has zero endpoints**, so nothing serves it and it cannot
   be called, despite appearing in the model list. Check `endpoints` is
   non-empty before adding a slug to the catalog.
+- **Two models are deliberately absent from the catalog.** `meta/muse-image`
+  because nothing serves it, and `bytedance-seed/seedream-5-0-pro` because it
+  measured **94.5s at the lowest effort** — past Netlify's ceiling however the
+  slider is set, so offering it could only waste a paid slot. Both are worth
+  re-testing after a provider change; `exceedsCap` exists to flag the next one.
+- **Advertised prices were wrong by up to 7x in both directions.** The
+  token-derived estimates put GPT Image 2.5 at $0.13 and Nano Banana 2 at
+  $0.067; measured at lowest effort they are $0.0185 and $0.0454. Effort is why
+  — GPT's axis is `quality` while Nano Banana's is `resolution`, so Draft on
+  the latter means a literal 512px image that costs more than a 1024px one from
+  the former. Run `tools/compare-models.ts` rather than trusting a number.
 - **Billing is all-or-nothing.** A failed or cancelled generation is not
   billed, and returns 502 rather than a partial image. A client disconnect may
   still cost OpenRouter, but never the caller.
