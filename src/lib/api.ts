@@ -124,6 +124,8 @@ export type GenerateOptions = {
   style: string;
   effort: number;
   aspect: string;
+  /** 1-10, how closely the render must follow the drawing. */
+  fidelity: number;
 };
 
 /**

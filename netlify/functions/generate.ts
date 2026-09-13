@@ -1,7 +1,11 @@
 import { json, requireAuth } from '../lib/auth';
 import {
+  DEFAULT_FIDELITY,
   DEFAULT_MODEL_ID,
+  FIDELITY_MAX,
+  FIDELITY_MIN,
   effortParams,
+  fidelityClause,
   findModel,
   findStyle,
   type EffortLevel,
@@ -21,12 +25,15 @@ const MAX_SKETCH_BYTES = 4 * 1024 * 1024;
  * so it tends to reproduce the wobbly lines faithfully — cleaning up the
  * sketch rather than realising it. Saying what the input *is* is what turns
  * this from image-editing into sketch-to-image.
+ *
+ * Deliberately says nothing about how closely to follow the drawing. That used
+ * to live here as "keep the arrangement, proportions and placement", which
+ * silently pinned every render near maximum adherence and would now contradict
+ * a low setting. It is `fidelityClause` alone that speaks to that.
  */
 const PREAMBLE =
-  'The reference image is a rough hand-drawn sketch. Treat it as a layout and ' +
-  'composition guide: keep the arrangement, proportions and placement of what ' +
-  'is drawn, but render it as a finished image rather than copying the pencil ' +
-  'strokes. Ignore stray marks.';
+  'The reference image is a rough hand-drawn sketch. Render it as a finished ' +
+  'image rather than copying the pencil strokes, and ignore stray marks.';
 
 const FALLBACK_PROMPT =
   'Render the sketch as a detailed, well-lit illustration, choosing a style ' +
@@ -82,6 +89,7 @@ export default async (request: Request): Promise<Response> => {
     style?: unknown;
     effort?: unknown;
     aspect?: unknown;
+    fidelity?: unknown;
   };
   try {
     body = (await request.json()) as typeof body;
@@ -122,13 +130,23 @@ export default async (request: Request): Promise<Response> => {
     return json({ error: `${model.id} does not support aspect ${aspect.slice(0, 20)}` }, 400);
   }
 
+  const fidelity = typeof body.fidelity === 'number' ? body.fidelity : DEFAULT_FIDELITY;
+  if (!Number.isInteger(fidelity) || fidelity < FIDELITY_MIN || fidelity > FIDELITY_MAX) {
+    return json({ error: `fidelity must be an integer from ${FIDELITY_MIN} to ${FIDELITY_MAX}` }, 400);
+  }
+
   const typed = typeof body.prompt === 'string' ? body.prompt.trim() : '';
-  // Style is a clause appended to whatever you typed, which is why it composes
-  // with every model: it never becomes a request parameter.
-  const instruction = [typed || (style.clause ? '' : FALLBACK_PROMPT), style.clause]
-    .filter(Boolean)
-    .join(' ');
-  const asked = instruction || FALLBACK_PROMPT;
+  // Fidelity and style are both clauses rather than request parameters, which
+  // is what makes them compose with every model. Ordered so the model is told
+  // what the input is, then how closely to follow it, then what it should
+  // become, then how to render it. Each part is terminated, because a typed
+  // fragment like "a hilltop cottage" otherwise runs into the clause beside it
+  // and reads as a continuation of it.
+  const asked =
+    [fidelityClause(fidelity), typed || (style.clause ? '' : FALLBACK_PROMPT), style.clause]
+      .filter(Boolean)
+      .map((part) => (/[.!?]$/.test(part) ? part : `${part}.`))
+      .join(' ') || FALLBACK_PROMPT;
 
   const startedAt = Date.now();
   let response: Response;
@@ -183,6 +201,7 @@ export default async (request: Request): Promise<Response> => {
     effort,
     effortParam: effortParams(model, effort),
     style: style.id,
+    fidelity,
     aspect,
     mediaType: image.media_type ?? null,
   });

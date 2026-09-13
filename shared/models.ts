@@ -1,5 +1,5 @@
 /**
- * The model catalog, and the three control axes built on top of it.
+ * The model catalog, and the four control axes built on top of it.
  *
  * Shared by the UI and by `netlify/functions/generate.ts`, which validates
  * every incoming choice against it — a picker in the browser is a suggestion,
@@ -232,6 +232,66 @@ export const STYLES: StyleSpec[] = [
 
 export function findStyle(id: string): StyleSpec | undefined {
   return STYLES.find((s) => s.id === id);
+}
+
+/**
+ * How closely the render must follow the drawing, 1 to 10.
+ *
+ * Like style, this is prompt text rather than an API parameter — no image model
+ * exposes a fidelity knob, and `input_references` is all-or-nothing. So it is
+ * orthogonal to model and effort by construction.
+ *
+ * It replaces what used to be hardcoded in the preamble: every render was told
+ * to "keep the arrangement, proportions and placement", roughly a 9, with no
+ * way to ask for a looser reading. Hence the default of 8 — close to the old
+ * behaviour, with room to move in both directions.
+ *
+ * The clause carries both the number and prose. The number alone is too vague
+ * to steer a model reliably; the prose alone loses the sense of a dial.
+ */
+export const FIDELITY_MIN = 1;
+export const FIDELITY_MAX = 10;
+export const DEFAULT_FIDELITY = 8;
+
+export function fidelityClause(level: number): string {
+  const n = Math.min(FIDELITY_MAX, Math.max(FIDELITY_MIN, Math.round(level)));
+  const prefix = `Sketch adherence: ${n} out of 10.`;
+
+  if (n <= 3) {
+    return (
+      `${prefix} Treat the sketch as loose inspiration only. Keep the subject, ` +
+      'but feel free to recompose it, change placement and proportions, and add ' +
+      'detail or surroundings that were never drawn.'
+    );
+  }
+  if (n <= 6) {
+    return (
+      `${prefix} Follow the sketch's overall composition and the identity of ` +
+      'each element, but reinterpret proportions and details freely, and add ' +
+      'surrounding detail where it helps the image.'
+    );
+  }
+  if (n <= 8) {
+    return (
+      `${prefix} Keep the arrangement, proportions and placement of what is ` +
+      'drawn. Do not add or remove elements, though you may resolve ambiguity ' +
+      'in how a shape is interpreted.'
+    );
+  }
+  return (
+    `${prefix} Match the drawing exactly: same arrangement, proportions, ` +
+    'placement, orientation and count of every element, and nothing present ' +
+    'that was not drawn. Where the sketch is crude, render that same form ' +
+    'faithfully rather than substituting a more plausible one.'
+  );
+}
+
+/** The word shown beside the slider, so the number is not the only cue. */
+export function fidelityLabel(level: number): string {
+  if (level <= 3) return 'Loose';
+  if (level <= 6) return 'Guided';
+  if (level <= 8) return 'Close';
+  return 'Exact';
 }
 
 /**

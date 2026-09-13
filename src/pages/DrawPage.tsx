@@ -4,6 +4,7 @@ import 'tldraw/tldraw.css';
 import { Unauthorized, clearToken, generate, type Generated } from '../lib/api';
 import { clearTurns, loadTurns, makeTurn, saveTurns, type Turn } from '../lib/history';
 import {
+  DEFAULT_FIDELITY,
   DEFAULT_MODEL_ID,
   findModel,
   nearestAspect,
@@ -60,6 +61,9 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
   // model it is also the only setting that cannot quietly cost more than it is
   // worth. Raise it deliberately.
   const [effort, setEffort] = useState<EffortLevel>(0);
+  // 8 matches what the preamble used to demand unconditionally, so the default
+  // behaviour is unchanged and the slider only opens up new territory.
+  const [fidelity, setFidelity] = useState(DEFAULT_FIDELITY);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<Generated | null>(null);
@@ -133,6 +137,7 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
         style,
         effort,
         aspect,
+        fidelity,
       });
       setResult(generated);
 
@@ -144,6 +149,7 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
           model: generated.model,
           style,
           effort,
+          fidelity,
           aspect,
           elapsedMs: generated.elapsedMs,
           costUsd: generated.cost,
@@ -213,6 +219,8 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
           onStyle={setStyle}
           effort={effort}
           onEffort={setEffort}
+          fidelity={fidelity}
+          onFidelity={setFidelity}
           aspect={aspect}
         />
 

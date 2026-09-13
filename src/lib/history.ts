@@ -33,6 +33,7 @@ export type Turn = {
   model: string;
   style: string;
   effort: number;
+  fidelity: number;
   aspect: string;
   /** Measured, not advertised. OpenRouter publishes no latency for images. */
   elapsedMs: number;

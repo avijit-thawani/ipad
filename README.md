@@ -16,7 +16,7 @@ because the Generate button spends real money.
 | Folder | What it is |
 |---|---|
 | `src/` | `pages/DrawPage.tsx` is the layout; `components/` holds the two control bars. |
-| `shared/models.ts` | the model catalog and the three control axes, imported by **both** the UI and the function. |
+| `shared/models.ts` | the catalog and the four control axes, imported by **both** the UI and the function. |
 | `netlify/functions/` | `login` issues a token, `generate` is the only holder of the OpenRouter key. |
 
 ## The one rule
@@ -57,17 +57,17 @@ print onto the page via an `ErrorBoundary` plus an ES5 handler in `index.html`
 — not a module, so it survives a syntax error in the bundle. Both end with the
 user agent.
 
-## The three controls
+## The four controls
 
 Landscape only: canvas left, render right, controls in one bottom bar. tldraw's
-toolbar and style panel are off (`HIDDEN_UI`) and replaced by pen and eraser
-alone. Both panes are exactly half the width, and the sketch exports at the
-**viewport** bounds, not the shapes' bounding box — so the render returns the
-same shape as the space you drew in.
+own UI is off (`HIDDEN_UI`), replaced by pen and eraser alone. Both panes are
+half the width, and the sketch exports at the **viewport** bounds, not the
+shapes' bounding box — so the render is the same shape as the space you drew in.
 
 | Axis | How orthogonal it really is |
 |---|---|
 | **Style** | Completely — only text appended to the prompt, so every model takes it. |
+| **Sketch** | Completely, same reason: 1-10 adherence, rendered as a clause. No model has a fidelity parameter. |
 | **Model** | Completely — just a slug. |
 | **Effort** | Not underneath. No image model has a reasoning-effort concept; `quality` (9 of 52) and `resolution` (19) are different parameters. One slider per model, disabled where neither exists, lowest by default. |
 

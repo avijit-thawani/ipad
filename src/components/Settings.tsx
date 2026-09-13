@@ -1,10 +1,22 @@
-import { EFFORT_LABELS, MODELS, STYLES, type EffortLevel, type ModelSpec } from '../../shared/models';
+import {
+  EFFORT_LABELS,
+  FIDELITY_MAX,
+  FIDELITY_MIN,
+  MODELS,
+  STYLES,
+  fidelityLabel,
+  type EffortLevel,
+  type ModelSpec,
+} from '../../shared/models';
 
 /**
- * The three control axes, which are orthogonal in the interface but not in the
+ * The four control axes, which are orthogonal in the interface but not in the
  * request:
  *
  * - **Style** is pure text appended to the prompt, so every model takes it.
+ * - **Sketch** is the same trick: an adherence level out of 10, turned into a
+ *   clause. No image model exposes a fidelity parameter, and the reference
+ *   image is all-or-nothing, so prompt text is the only lever there is.
  * - **Model** is the slug.
  * - **Effort** is the leaky one. There is no reasoning-effort concept for image
  *   models; the nearest equivalents are `quality` (only 9 of 52 models) and
@@ -24,6 +36,8 @@ export default function Settings({
   onStyle,
   effort,
   onEffort,
+  fidelity,
+  onFidelity,
   aspect,
 }: {
   model: ModelSpec;
@@ -32,6 +46,8 @@ export default function Settings({
   onStyle: (id: string) => void;
   effort: EffortLevel;
   onEffort: (level: EffortLevel) => void;
+  fidelity: number;
+  onFidelity: (level: number) => void;
   aspect: string;
 }) {
   const chip = (active: boolean) =>
@@ -95,6 +111,24 @@ export default function Settings({
           {model.effortAxis
             ? `${EFFORT_LABELS[effort]} · ${model.effortStops[effort]}`
             : 'fixed'}
+        </span>
+      </div>
+
+      {/* Prompt text, not a request parameter — no image model has a fidelity
+          knob — so unlike effort this one works identically on every model. */}
+      <div className="flex items-center gap-2 shrink-0">
+        <span className="text-xs text-base-content/60">Sketch</span>
+        <input
+          type="range"
+          min={FIDELITY_MIN}
+          max={FIDELITY_MAX}
+          step={1}
+          value={fidelity}
+          onChange={(e) => onFidelity(Number(e.target.value))}
+          className="range range-xs w-24"
+        />
+        <span className="text-xs text-base-content/50">
+          {fidelityLabel(fidelity)} · {fidelity}/10
         </span>
       </div>
 
