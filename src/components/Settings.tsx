@@ -61,9 +61,12 @@ export default function Settings({
         className="rounded-field bg-base-100 border-2 border-base-content/15 px-2 py-1 text-xs
                    focus:border-primary/60 focus:outline-none max-w-56"
       >
+        {/* Measured figures rather than advertised ones: the label is what you
+            actually paid and waited, from tools/compare-models.ts. */}
         {MODELS.map((m) => (
           <option key={m.id} value={m.id}>
-            {m.label} · ~${m.priceUsd.toFixed(3)}
+            {m.label} · ${m.measuredUsd.toFixed(3)} · {m.measuredSeconds}s
+            {m.exceedsCap ? ' · too slow' : ''}
           </option>
         ))}
       </select>
@@ -97,10 +100,17 @@ export default function Settings({
           comes back the same shape as what you drew. */}
       <span className="text-xs text-base-content/40 whitespace-nowrap">shape {aspect}</span>
 
-      {model.slowAtHighEffort && effort >= 2 && (
-        <span className="text-xs text-warning whitespace-nowrap" title={model.priceNote}>
-          may exceed the 50s cap
+      {model.exceedsCap ? (
+        <span className="text-xs text-error whitespace-nowrap">
+          measured {model.measuredSeconds}s — over the 50s cap even at Draft
         </span>
+      ) : (
+        model.slowAtHighEffort &&
+        effort >= 2 && (
+          <span className="text-xs text-warning whitespace-nowrap" title={model.priceNote}>
+            may exceed the 50s cap
+          </span>
+        )
       )}
 
       <span className="text-xs text-base-content/40 whitespace-nowrap">

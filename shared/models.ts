@@ -48,6 +48,19 @@ export type ModelSpec = {
    * warning in the UI once effort is raised past Normal.
    */
   slowAtHighEffort: boolean;
+  /**
+   * Measured, at lowest effort, by `tools/compare-models.ts` on one sketch —
+   * so indicative rather than a benchmark, but real, which is more than
+   * OpenRouter offers. Seconds for the whole round trip.
+   */
+  measuredSeconds: number;
+  /** Measured cost of that same call, in USD. */
+  measuredUsd: number;
+  /**
+   * True when even the *lowest* effort blew the 50s budget, which makes the
+   * model unusable from this app however you set the slider.
+   */
+  exceedsCap: boolean;
 };
 
 export const EFFORT_LABELS = ['Draft', 'Normal', 'High', 'Max'] as const;
@@ -67,6 +80,9 @@ export const MODELS: ModelSpec[] = [
     effortStops: ['512', '1K', '2K', '4K'],
     aspectRatios: GEMINI_ASPECTS,
     supportsSeed: false,
+    measuredSeconds: 8.8,
+    measuredUsd: 0.0454,
+    exceedsCap: false,
     slowAtHighEffort: false,
   },
   {
@@ -79,6 +95,9 @@ export const MODELS: ModelSpec[] = [
     effortStops: [],
     aspectRatios: GEMINI_ASPECTS,
     supportsSeed: false,
+    measuredSeconds: 6.4,
+    measuredUsd: 0.0339,
+    exceedsCap: false,
     slowAtHighEffort: false,
   },
   {
@@ -91,6 +110,9 @@ export const MODELS: ModelSpec[] = [
     effortStops: ['1K', '1K', '2K', '4K'],
     aspectRatios: ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'],
     supportsSeed: false,
+    measuredSeconds: 23.5,
+    measuredUsd: 0.1357,
+    exceedsCap: false,
     slowAtHighEffort: false,
   },
   {
@@ -103,6 +125,9 @@ export const MODELS: ModelSpec[] = [
     effortStops: ['low', 'medium', 'high', 'max'],
     aspectRatios: OPENAI_ASPECTS,
     supportsSeed: false,
+    measuredSeconds: 19.6,
+    measuredUsd: 0.0185,
+    exceedsCap: false,
     slowAtHighEffort: true,
   },
   {
@@ -115,6 +140,9 @@ export const MODELS: ModelSpec[] = [
     effortStops: ['low', 'medium', 'high', 'max'],
     aspectRatios: OPENAI_ASPECTS,
     supportsSeed: false,
+    measuredSeconds: 14.1,
+    measuredUsd: 0.0185,
+    exceedsCap: false,
     slowAtHighEffort: true,
   },
   {
@@ -127,6 +155,9 @@ export const MODELS: ModelSpec[] = [
     effortStops: ['low', 'medium', 'high', 'high'],
     aspectRatios: OPENAI_ASPECTS,
     supportsSeed: false,
+    measuredSeconds: 14.4,
+    measuredUsd: 0.0184,
+    exceedsCap: false,
     slowAtHighEffort: true,
   },
   {
@@ -139,6 +170,9 @@ export const MODELS: ModelSpec[] = [
     effortStops: ['1K', '1K', '2K', '2K'],
     aspectRatios: ['1:1', '1:2', '2:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'],
     supportsSeed: true,
+    measuredSeconds: 94.5,
+    measuredUsd: 0.045,
+    exceedsCap: true,
     slowAtHighEffort: false,
   },
   {
@@ -151,6 +185,9 @@ export const MODELS: ModelSpec[] = [
     effortStops: [],
     aspectRatios: OPENAI_ASPECTS,
     supportsSeed: true,
+    measuredSeconds: 14.0,
+    measuredUsd: 0.06,
+    exceedsCap: false,
     slowAtHighEffort: false,
   },
 ];
