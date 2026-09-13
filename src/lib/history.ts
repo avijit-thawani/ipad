@@ -31,10 +31,35 @@ export type Turn = {
   id: string;
   prompt: string;
   model: string;
+  style: string;
+  effort: number;
+  aspect: string;
+  /** Measured, not advertised. OpenRouter publishes no latency for images. */
+  elapsedMs: number;
+  costUsd: number | null;
   at: string;
   sketchThumb: string;
   resultThumb: string;
 };
+
+/**
+ * What a model has actually cost and how long it has actually taken, averaged
+ * over this browser's history. The catalog's figures are estimates derived
+ * from per-token pricing; these are the real ones.
+ */
+export type Observed = { runs: number; meanMs: number; meanCost: number | null };
+
+export function observe(turns: Turn[], modelId: string): Observed | null {
+  const mine = turns.filter((t) => t.model === modelId);
+  if (!mine.length) return null;
+
+  const costs = mine.map((t) => t.costUsd).filter((c): c is number => typeof c === 'number');
+  return {
+    runs: mine.length,
+    meanMs: Math.round(mine.reduce((sum, t) => sum + (t.elapsedMs || 0), 0) / mine.length),
+    meanCost: costs.length ? costs.reduce((a, b) => a + b, 0) / costs.length : null,
+  };
+}
 
 /**
  * Draw a data URL into a canvas no bigger than THUMB_PX on its long edge and

@@ -48,6 +48,38 @@ Each of these cost a debugging round. Verified Sept 2026, iPad + Pencil 1.
   Only 401 now means the password was actually rejected, and a body that is not
   JSON is printed rather than reduced to "unexpected token".
 
+## Models, prices and the effort dial
+
+- **There is no reasoning-effort parameter for image models.** Of the 52
+  image-input models, `aspect_ratio` (51) and `input_references` (51) are the
+  only near-universal parameters. The effort-like ones are minorities and are
+  not the same knob: `quality` (9 models, enum `auto|low|medium|high` plus
+  `xhigh|max` on GPT Image 2.5) and `resolution` (19 models, enum
+  `512|1K|2K|4K`). `seed` is 12, `background` 10. So one slider has to map onto
+  whichever axis the chosen model has, and disable itself for those with
+  neither — `effortAxis` in the catalog.
+- **A slow model cannot work here at all.** Netlify's synchronous ceiling is
+  60s and is not configurable. OpenRouter's own documented example has
+  `openai/gpt-image-2` at `quality: high` taking **94 seconds** — it would be
+  killed. This is the main reason Nano Banana 2 (~17s) is the default, and why
+  the GPT family is flagged `slowAtHighEffort` and warns in the UI.
+- **Advertised prices are estimates and the units differ.** Some models bill a
+  flat price per image (Seedream 5 Pro, $0.045), some per megapixel (FLUX.2
+  Pro, $0.03), and most per output *token* — which means cost rises with effort
+  and no single number is honest. The same documented example cost **$0.13**,
+  four times the token-derived estimate. The true figure arrives in
+  `usage.cost` on every call, which is what the UI displays.
+- **OpenRouter publishes no latency for image models.** The per-endpoint
+  records carry pricing, parameters and streaming support, and no timing field
+  at all. The only honest latency is measured locally, which is why every turn
+  records `elapsedMs` and the bar shows a per-model mean.
+- **`meta/muse-image` has zero endpoints**, so nothing serves it and it cannot
+  be called, despite appearing in the model list. Check `endpoints` is
+  non-empty before adding a slug to the catalog.
+- **Billing is all-or-nothing.** A failed or cancelled generation is not
+  billed, and returns 502 rather than a partial image. A client disconnect may
+  still cost OpenRouter, but never the caller.
+
 ## Cost and limits
 
 - **localStorage cannot hold the renders.** Two ~1 MB base64 PNGs per round

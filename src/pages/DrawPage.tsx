@@ -1,8 +1,23 @@
-import { useRef, useState } from 'react';
-import { Tldraw, type Editor } from 'tldraw';
+import { useEffect, useRef, useState } from 'react';
+import { Box, Tldraw, type Editor, type TLUiComponents } from 'tldraw';
 import 'tldraw/tldraw.css';
 import { Unauthorized, clearToken, generate, type Generated } from '../lib/api';
-import { clearTurns, loadTurns, makeTurn, saveTurns, type Turn } from '../lib/history';
+import {
+  clearTurns,
+  loadTurns,
+  makeTurn,
+  observe,
+  saveTurns,
+  type Turn,
+} from '../lib/history';
+import {
+  DEFAULT_MODEL_ID,
+  findModel,
+  nearestAspect,
+  type EffortLevel,
+} from '../../shared/models';
+import CanvasTools from '../components/CanvasTools';
+import Settings from '../components/Settings';
 
 /**
  * Client-side validated and domain-restricted, so shipping it in the bundle is
@@ -10,22 +25,92 @@ import { clearTurns, loadTurns, makeTurn, saveTurns, type Turn } from '../lib/hi
  */
 const LICENSE_KEY = import.meta.env.VITE_TLDRAW_LICENSE_KEY as string | undefined;
 
+/**
+ * Everything tldraw would normally float over the canvas is switched off, so
+ * the left pane is drawing surface and nothing else. The equivalent controls
+ * are in the bottom bar, in `CanvasTools`.
+ */
+const HIDDEN_UI: TLUiComponents = {
+  Toolbar: null,
+  StylePanel: null,
+  PageMenu: null,
+  MainMenu: null,
+  MenuPanel: null,
+  ActionsMenu: null,
+  QuickActions: null,
+  ZoomMenu: null,
+  NavigationPanel: null,
+  HelpMenu: null,
+  HelperButtons: null,
+  DebugPanel: null,
+  DebugMenu: null,
+  TopPanel: null,
+  SharePanel: null,
+  Minimap: null,
+  ContextMenu: null,
+};
+
 export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
-  const editorRef = useRef<Editor | null>(null);
+  const canvasPaneRef = useRef<HTMLDivElement | null>(null);
+  /**
+   * State rather than a ref: the bottom bar is a sibling of the canvas, so it
+   * has to re-render once the editor exists or its buttons would stay wired to
+   * nothing. Assigning a ref would not trigger that.
+   */
+  const [editor, setEditor] = useState<Editor | null>(null);
+
   const [prompt, setPrompt] = useState('');
+  const [modelId, setModelId] = useState(DEFAULT_MODEL_ID);
+  const [style, setStyle] = useState('none');
+  const [effort, setEffort] = useState<EffortLevel>(1);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<Generated | null>(null);
   const [turns, setTurns] = useState<Turn[]>(() => loadTurns());
-  /** A past round being looked at, which shows its thumbnail rather than a full render. */
+  /** A past round being looked at, which shows its thumbnail, not a full render. */
   const [viewing, setViewing] = useState<Turn | null>(null);
 
+  const model = findModel(modelId) ?? findModel(DEFAULT_MODEL_ID)!;
+
+  /**
+   * The shape of the canvas pane, snapped to the nearest ratio this model
+   * supports. Both panes are exactly half the width and the same height, so
+   * this is also the shape of the render pane — which is the point: the
+   * generated image comes back the same shape as the space you drew in.
+   *
+   * Kept in state because it depends on layout, which React does not re-render
+   * for; rotating the iPad has to update it.
+   */
+  const [paneSize, setPaneSize] = useState({ w: 1, h: 1 });
+
+  useEffect(() => {
+    const pane = canvasPaneRef.current;
+    if (!pane) return;
+    const measure = () => setPaneSize({ w: pane.clientWidth, h: pane.clientHeight });
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(pane);
+    return () => observer.disconnect();
+  }, []);
+
+  const aspect = nearestAspect(model, paneSize.w, paneSize.h);
+
+  function signOut() {
+    clearToken();
+    onSignedOut();
+  }
+
+  function forget() {
+    clearTurns();
+    setTurns([]);
+    setViewing(null);
+    setResult(null);
+  }
+
   async function onGenerate() {
-    const editor = editorRef.current;
     if (!editor || busy) return;
 
-    const shapeIds = [...editor.getCurrentPageShapeIds()];
-    if (shapeIds.length === 0) {
+    if (editor.getCurrentPageShapeIds().size === 0) {
       setError('Draw something first.');
       return;
     }
@@ -34,17 +119,24 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
     setError('');
     setViewing(null);
     try {
-      // pixelRatio 1 on purpose. The sketch is line art, so a denser export
-      // tells the model nothing extra, and Netlify caps a buffered request and
-      // its response at 6 MB combined — which a 2x sketch plus a 1K render
-      // gets uncomfortably close to.
-      const { url } = await editor.toImageDataUrl(shapeIds, {
+      // Export the viewport rather than the shapes' bounding box. Exporting the
+      // bounding box would make the sketch whatever shape you happened to draw
+      // in, so the render would never match the pane. pixelRatio 1 because the
+      // sketch is line art and Netlify caps the payload at 6 MB.
+      const { url } = await editor.toImageDataUrl([...editor.getCurrentPageShapeIds()], {
         format: 'png',
         background: true,
         pixelRatio: 1,
+        bounds: Box.From(editor.getViewportPageBounds()),
       });
 
-      const generated = await generate(url, prompt);
+      const generated = await generate(url, {
+        prompt,
+        model: model.id,
+        style,
+        effort,
+        aspect,
+      });
       setResult(generated);
 
       // Recording the round must not be able to lose it: the render is already
@@ -53,13 +145,18 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
         const turn = await makeTurn({
           prompt,
           model: generated.model,
+          style,
+          effort,
+          aspect,
+          elapsedMs: generated.elapsedMs,
+          costUsd: generated.cost,
           sketch: url,
           result: generated.image,
         });
         setTurns(saveTurns([turn, ...turns]));
       } catch (e) {
         setError(
-          `The render is fine, but saving it to the session strip failed: ${
+          `The render is fine, but saving it to the strip failed: ${
             e instanceof Error ? e.message : String(e)
           }`
         );
@@ -75,45 +172,25 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
     }
   }
 
-  function signOut() {
-    clearToken();
-    onSignedOut();
-  }
-
-  function forget() {
-    clearTurns();
-    setTurns([]);
-    setViewing(null);
-    setResult(null);
-  }
-
   const shown = viewing ? viewing.resultThumb : result?.image;
 
   return (
-    // Always two columns, never stacked: this only ever runs on an iPad, and
-    // the point is to see the sketch and the render at once. Nothing here may
-    // scroll the page, so every flex child that could grow carries min-h-0.
-    <div className="h-full flex overflow-hidden">
-      <div className="relative flex-1 min-w-0">
-        {/* persistenceKey alone gives local IndexedDB persistence of the whole
-            document, so a Safari tab eviction mid-sketch is survivable. */}
-        <Tldraw
-          persistenceKey="ipad-sketch"
-          licenseKey={LICENSE_KEY}
-          onMount={(editor) => {
-            editorRef.current = editor;
-          }}
-        />
-      </div>
+    // Three bands: two equal panes across the top, one full-width bar beneath.
+    // Nothing may scroll the page, so every growable child carries min-h-0.
+    <div className="h-full flex flex-col overflow-hidden">
+      <div className="flex-1 min-h-0 flex">
+        <div ref={canvasPaneRef} className="relative w-1/2 min-w-0 border-r border-base-300">
+          {/* persistenceKey alone gives local IndexedDB persistence of the whole
+              document, so a Safari tab eviction mid-sketch is survivable. */}
+          <Tldraw
+            persistenceKey="ipad-sketch"
+            licenseKey={LICENSE_KEY}
+            components={HIDDEN_UI}
+            onMount={setEditor}
+          />
+        </div>
 
-      <aside
-        className="flex flex-col gap-2.5 shrink-0 overflow-hidden border-l border-base-300
-                   bg-base-200 p-3 h-full w-[38%] min-w-[17rem] max-w-[28rem] safe-bottom"
-      >
-        {/* The render takes every pixel the controls do not need, because it is
-            the thing you are looking at. Controls sit underneath, within reach
-            of the hand already holding the Pencil. */}
-        <div className="flex-1 min-h-0 rounded-box bg-base-100 border-2 border-base-content/10 overflow-hidden flex items-center justify-center">
+        <div className="w-1/2 min-w-0 flex items-center justify-center bg-base-100 overflow-hidden">
           {shown ? (
             <img
               src={shown}
@@ -121,55 +198,45 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
               className="max-w-full max-h-full object-contain animate-pop-in"
             />
           ) : (
-            <p className="text-base-content/35 text-sm px-6 text-center">
-              {busy ? 'Asking the model…' : 'Your render lands here.'}
+            <p className="text-base-content/30 text-sm px-8 text-center">
+              {busy ? 'Asking the model…' : 'Your render lands here, in this shape.'}
             </p>
           )}
         </div>
+      </div>
 
-        {result && !viewing && (
-          <div className="flex items-center justify-between text-xs text-base-content/50 shrink-0">
-            <a href={result.image} download="render.png" className="link">
-              Download full size
-            </a>
-            <span>
-              {result.model.split('/').pop()}
-              {result.cost !== null && ` · $${result.cost.toFixed(3)}`}
-            </span>
-          </div>
-        )}
-
-        {error && <p className="text-error text-sm shrink-0">{error}</p>}
-
-        <textarea
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Render this as a watercolour street scene at dusk…"
-          rows={2}
-          className="w-full shrink-0 resize-none rounded-box bg-base-100 border-2
-                     border-base-content/15 focus:border-primary/60 focus:outline-none
-                     px-3 py-2 placeholder:text-base-content/35 transition-colors"
+      <div className="shrink-0 border-t border-base-300 bg-base-200 px-3 py-2 flex flex-col gap-2 safe-bottom">
+        <CanvasTools editor={editor} />
+        <Settings
+          model={model}
+          onModel={setModelId}
+          style={style}
+          onStyle={setStyle}
+          effort={effort}
+          onEffort={setEffort}
+          aspect={aspect}
+          observed={observe(turns, model.id)}
         />
 
-        <button
-          onClick={onGenerate}
-          disabled={busy}
-          className="btn btn-chunky btn-primary btn-block rounded-field font-semibold shrink-0"
-        >
-          {busy ? 'Drawing… (~20s)' : 'Generate'}
-        </button>
+        <div className="flex items-center gap-2">
+          <input
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder="What should it become? (a style button alone is enough)"
+            className="flex-1 min-w-0 rounded-field bg-base-100 border-2 border-base-content/15
+                       focus:border-primary/60 focus:outline-none px-3 py-2
+                       placeholder:text-base-content/35 transition-colors"
+          />
+          <button
+            onClick={onGenerate}
+            disabled={busy}
+            className="btn btn-chunky btn-primary rounded-field font-semibold shrink-0"
+          >
+            {busy ? 'Drawing…' : 'Generate'}
+          </button>
 
-        {turns.length > 0 && (
-          <div className="flex flex-col gap-1 shrink-0">
-            <div className="flex items-center justify-between text-xs text-base-content/45">
-              <span>{turns.length} rounds</span>
-              <button onClick={forget} className="link">
-                Forget
-              </button>
-            </div>
-            {/* Horizontal only: a vertical scroller here would be the thing
-                that makes the panel scroll. */}
-            <div className="flex gap-2 overflow-x-auto overflow-y-hidden pb-1">
+          {turns.length > 0 && (
+            <div className="flex gap-1.5 items-center shrink-0 max-w-[34%] overflow-x-auto overflow-y-hidden">
               {turns.map((turn) => (
                 <button
                   key={turn.id}
@@ -177,25 +244,43 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
                     setViewing(turn);
                     setPrompt(turn.prompt);
                   }}
-                  title={turn.prompt || '(no prompt)'}
+                  title={`${turn.prompt || '(no prompt)'} — ${turn.model} · ${(
+                    turn.elapsedMs / 1000
+                  ).toFixed(1)}s`}
                   className={`shrink-0 rounded-field overflow-hidden border-2 transition-colors ${
                     viewing?.id === turn.id ? 'border-primary' : 'border-base-content/10'
                   }`}
                 >
-                  <img src={turn.resultThumb} alt={turn.prompt} className="w-12 h-12 object-cover" />
+                  <img src={turn.resultThumb} alt={turn.prompt} className="w-9 h-9 object-cover" />
                 </button>
               ))}
+              <button onClick={forget} className="link text-xs text-base-content/40 shrink-0">
+                Forget
+              </button>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
-        <button
-          onClick={signOut}
-          className="btn btn-ghost btn-xs text-base-content/40 shrink-0 self-end"
-        >
-          Sign out
-        </button>
-      </aside>
+        <div className="flex items-center justify-between gap-3 text-xs">
+          <span className="text-error truncate">{error}</span>
+          <span className="text-base-content/50 shrink-0 flex gap-3 items-center">
+            {result && !viewing && (
+              <>
+                <a href={result.image} download="render.png" className="link">
+                  Download
+                </a>
+                <span>
+                  {(result.elapsedMs / 1000).toFixed(1)}s
+                  {result.cost !== null && ` · $${result.cost.toFixed(3)}`}
+                </span>
+              </>
+            )}
+            <button onClick={signOut} className="link">
+              Sign out
+            </button>
+          </span>
+        </div>
+      </div>
     </div>
   );
 }

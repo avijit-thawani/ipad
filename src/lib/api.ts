@@ -110,6 +110,20 @@ export type Generated = {
   model: string;
   /** What OpenRouter billed for the call, in USD, when it tells us. */
   cost: number | null;
+  /**
+   * Wall-clock time for the round trip. Measured here because OpenRouter
+   * publishes no latency figure for image models — the endpoint records carry
+   * pricing only — so the only honest numbers are the ones we observe.
+   */
+  elapsedMs: number;
+};
+
+export type GenerateOptions = {
+  prompt: string;
+  model: string;
+  style: string;
+  effort: number;
+  aspect: string;
 };
 
 /**
@@ -117,6 +131,11 @@ export type Generated = {
  * inside Netlify's 60s synchronous limit but long enough that the caller must
  * show progress rather than a spinner-free wait.
  */
-export function generate(sketch: string, prompt: string): Promise<Generated> {
-  return call('/generate', { method: 'POST', body: JSON.stringify({ sketch, prompt }) });
+export async function generate(sketch: string, options: GenerateOptions): Promise<Generated> {
+  const started = Date.now();
+  const result = await call<Omit<Generated, 'elapsedMs'>>('/generate', {
+    method: 'POST',
+    body: JSON.stringify({ sketch, ...options }),
+  });
+  return { ...result, elapsedMs: Date.now() - started };
 }

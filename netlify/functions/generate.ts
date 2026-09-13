@@ -1,6 +1,11 @@
 import { json, requireAuth } from '../lib/auth';
-
-const DEFAULT_MODEL = 'google/gemini-3.1-flash-image';
+import {
+  DEFAULT_MODEL_ID,
+  effortParams,
+  findModel,
+  findStyle,
+  type EffortLevel,
+} from '../../shared/models';
 
 /**
  * Netlify kills a synchronous function at 60s. Bailing at 50 leaves room to
@@ -60,16 +65,21 @@ export default async (request: Request): Promise<Response> => {
   const key = process.env.OPENROUTER_API_KEY;
   if (!key) return json({ error: 'OPENROUTER_API_KEY is not set' }, 500);
 
-  let sketch: unknown;
-  let prompt: unknown;
+  let body: {
+    sketch?: unknown;
+    prompt?: unknown;
+    model?: unknown;
+    style?: unknown;
+    effort?: unknown;
+    aspect?: unknown;
+  };
   try {
-    const body = (await request.json()) as { sketch?: unknown; prompt?: unknown };
-    sketch = body.sketch;
-    prompt = body.prompt;
+    body = (await request.json()) as typeof body;
   } catch {
     return json({ error: 'invalid body' }, 400);
   }
 
+  const { sketch } = body;
   if (typeof sketch !== 'string' || !sketch.startsWith('data:image/')) {
     return json({ error: 'sketch must be an image data URL' }, 400);
   }
@@ -77,8 +87,38 @@ export default async (request: Request): Promise<Response> => {
     return json({ error: 'sketch is too large' }, 413);
   }
 
-  const asked = typeof prompt === 'string' && prompt.trim() ? prompt.trim() : FALLBACK_PROMPT;
-  const model = process.env.IMAGE_MODEL || DEFAULT_MODEL;
+  // Every choice is re-checked here. The picker in the browser is a
+  // suggestion; this endpoint is what actually spends money, so an unknown
+  // model slug or a made-up quality value must not reach OpenRouter.
+  const requested = typeof body.model === 'string' ? body.model : '';
+  const envDefault = process.env.IMAGE_MODEL || DEFAULT_MODEL_ID;
+  const model = findModel(requested) ?? findModel(envDefault) ?? findModel(DEFAULT_MODEL_ID);
+  if (!model) return json({ error: 'no usable model configured' }, 500);
+  if (requested && !findModel(requested)) {
+    return json({ error: `unknown model: ${requested.slice(0, 80)}` }, 400);
+  }
+
+  const style = findStyle(typeof body.style === 'string' ? body.style : 'none');
+  if (!style) return json({ error: 'unknown style' }, 400);
+
+  const rawEffort = typeof body.effort === 'number' ? body.effort : 1;
+  if (!Number.isInteger(rawEffort) || rawEffort < 0 || rawEffort > 3) {
+    return json({ error: 'effort must be an integer from 0 to 3' }, 400);
+  }
+  const effort = rawEffort as EffortLevel;
+
+  const aspect = typeof body.aspect === 'string' ? body.aspect : '';
+  if (aspect && !model.aspectRatios.includes(aspect)) {
+    return json({ error: `${model.id} does not support aspect ${aspect.slice(0, 20)}` }, 400);
+  }
+
+  const typed = typeof body.prompt === 'string' ? body.prompt.trim() : '';
+  // Style is a clause appended to whatever you typed, which is why it composes
+  // with every model: it never becomes a request parameter.
+  const instruction = [typed || (style.clause ? '' : FALLBACK_PROMPT), style.clause]
+    .filter(Boolean)
+    .join(' ');
+  const asked = instruction || FALLBACK_PROMPT;
 
   let response: Response;
   try {
@@ -92,9 +132,11 @@ export default async (request: Request): Promise<Response> => {
         'X-Title': 'Sketch',
       },
       body: JSON.stringify({
-        model,
+        model: model.id,
         prompt: `${PREAMBLE}\n\n${asked}`,
         input_references: [{ type: 'image_url', image_url: { url: sketch } }],
+        ...(aspect ? { aspect_ratio: aspect } : {}),
+        ...effortParams(model, effort),
       }),
       signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     });
@@ -120,11 +162,11 @@ export default async (request: Request): Promise<Response> => {
     return json({ error: 'the model returned no image' }, 502);
   }
 
-  await saveForDebugging(sketch, image.b64_json, asked);
+  await saveForDebugging(sketch, image.b64_json, `${PREAMBLE}\n\n${asked}`);
 
   return json({
     image: `data:${image.media_type ?? 'image/png'};base64,${image.b64_json}`,
-    model,
+    model: model.id,
     cost: typeof result.usage?.cost === 'number' ? result.usage.cost : null,
   });
 };
