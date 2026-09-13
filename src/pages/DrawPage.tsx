@@ -236,7 +236,7 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
         </div>
       </div>
 
-      <div className="shrink-0 border-t border-base-300 bg-base-200 px-3 py-2 flex flex-col gap-2 safe-bottom">
+      <div className="shrink-0 border-t border-base-300 bg-base-200 px-3 pt-2.5 flex flex-col gap-2.5 safe-bottom">
         <CanvasTools editor={editor} />
 
         {/* A free-text box is commented out rather than deleted: the style and
@@ -267,7 +267,6 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
             onEffort={setEffort}
             adherence={adherence}
             onAdherence={setAdherence}
-            aspect={aspect}
           />
 
           <button
@@ -285,7 +284,7 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
               onClick={() => setShowHistory(!showHistory)}
               className="text-xs text-base-content/60 shrink-0 underline"
             >
-              {showHistory ? 'Hide' : `Past ${turns.length}`}
+              {showHistory ? 'Hide history' : `History ${turns.length}`}
             </button>
           )}
 
@@ -295,7 +294,7 @@ export default function DrawPage({ onSignedOut }: { onSignedOut: () => void }) {
             </a>
           )}
           <button onClick={signOut} className="link text-xs text-base-content/30 shrink-0">
-            Exit
+            Log out
           </button>
         </div>
 

@@ -1,5 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { DefaultColorStyle, DefaultSizeStyle, type Editor } from 'tldraw';
+import {
+  EraserIcon,
+  PenIcon,
+  RedoIcon,
+  SelectIcon,
+  TrashIcon,
+  UndoIcon,
+} from './icons';
 
 /**
  * tldraw's own toolbar and style panel are hidden (see HIDDEN_UI in DrawPage)
@@ -9,27 +17,19 @@ import { DefaultColorStyle, DefaultSizeStyle, type Editor } from 'tldraw';
  * editor is driven imperatively through a prop. Selection state is mirrored in
  * React rather than read back from the editor, which is fine because this is
  * the only thing that sets it.
- *
- * Colour and width are `select` elements rather than rows of buttons: twelve
- * swatches and four sizes were most of the clutter in the bar, and a native
- * select on iPadOS opens as a full-size picker, which is a better touch target
- * than anything hand-rolled.
  */
 
-/** Pen and eraser only. tldraw starts in `draw`, so the initial state is right. */
 const TOOLS = [
-  { id: 'draw', label: 'Pen' },
-  { id: 'eraser', label: 'Eraser' },
+  { id: 'draw', label: 'Pen', Icon: PenIcon },
+  { id: 'eraser', label: 'Eraser', Icon: EraserIcon },
+  { id: 'select', label: 'Select', Icon: SelectIcon },
 ] as const;
 
 /**
  * Eight of tldraw's thirteen. White is invisible on a white canvas, and the
- * four "light" variants are dropped so that every entry can carry a coloured
- * disc that actually matches it — there is no pale-blue emoji, and two options
- * showing the same disc would be worse than not offering the shade.
- *
- * The disc doubles as the control's own label: collapsed, the select reads
- * "🔵 Blue", which says both what it is and what it is set to.
+ * four "light" variants are dropped so every entry can carry a disc that
+ * actually matches it — there is no pale-blue emoji, and two options showing
+ * the same disc would be worse than not offering the shade.
  */
 const COLORS = [
   ['black', '⚫ Black'],
@@ -42,16 +42,16 @@ const COLORS = [
   ['violet', '🟣 Violet'],
 ] as const;
 
-/** The bar glyph shows the width; the nib says which control this is. */
+/** The bar scales with the setting, so the width is shown and not just named. */
 const SIZES = [
-  ['s', '✒️ Thin ▏'],
-  ['m', '✒️ Medium ▍'],
-  ['l', '✒️ Thick ▊'],
-  ['xl', '✒️ Heavy █'],
+  ['s', 'Thin ▏'],
+  ['m', 'Medium ▍'],
+  ['l', 'Thick ▊'],
+  ['xl', 'Heavy █'],
 ] as const;
 
-const chip = (active: boolean) =>
-  `px-2.5 py-1 rounded-field text-xs font-medium border transition-colors ${
+const iconButton = (active: boolean) =>
+  `p-1.5 rounded-field border transition-colors ${
     active
       ? 'bg-base-content text-base-100 border-base-content'
       : 'bg-base-100 border-base-content/15 text-base-content/70'
@@ -61,10 +61,19 @@ const select =
   'rounded-field bg-base-100 border-2 border-base-content/15 px-2 py-1 text-xs ' +
   'focus:border-primary/60 focus:outline-none';
 
+const label = 'text-xs text-base-content/60';
+
 export default function CanvasTools({ editor }: { editor: Editor | null }) {
   const [tool, setTool] = useState<string>('draw');
   const [color, setColor] = useState<string>('black');
   const [size, setSize] = useState<string>('m');
+
+  // tldraw opens in the select tool, so without this the pen looked chosen
+  // while taps did nothing but select. Set explicitly rather than relying on
+  // whatever tldraw's default happens to be in a given version.
+  useEffect(() => {
+    editor?.setCurrentTool('draw');
+  }, [editor]);
 
   function pickTool(id: string) {
     setTool(id);
@@ -88,45 +97,54 @@ export default function CanvasTools({ editor }: { editor: Editor | null }) {
   return (
     <div className="flex items-center gap-2 flex-wrap">
       <div className="flex gap-1">
-        {TOOLS.map((t) => (
-          <button key={t.id} onClick={() => pickTool(t.id)} className={chip(tool === t.id)}>
-            {t.label}
+        {TOOLS.map(({ id, label: name, Icon }) => (
+          <button
+            key={id}
+            onClick={() => pickTool(id)}
+            className={iconButton(tool === id)}
+            title={name}
+            aria-label={name}
+            aria-pressed={tool === id}
+          >
+            <Icon />
           </button>
         ))}
       </div>
 
+      {/* The disc in each option is the colour, so this select needs no label. */}
       <select
         value={color}
         onChange={(e) => pickColor(e.target.value)}
         aria-label="Stroke colour"
         className={select}
       >
-        {COLORS.map(([id, label]) => (
+        {COLORS.map(([id, name]) => (
           <option key={id} value={id}>
-            {label}
+            {name}
           </option>
         ))}
       </select>
 
+      <span className={label}>Stroke</span>
       <select
         value={size}
         onChange={(e) => pickSize(e.target.value)}
         aria-label="Stroke width"
         className={select}
       >
-        {SIZES.map(([id, label]) => (
+        {SIZES.map(([id, name]) => (
           <option key={id} value={id}>
-            {label}
+            {name}
           </option>
         ))}
       </select>
 
       <div className="flex gap-1">
-        <button onClick={() => editor?.undo()} className={chip(false)}>
-          Undo
+        <button onClick={() => editor?.undo()} className={iconButton(false)} title="Undo" aria-label="Undo">
+          <UndoIcon />
         </button>
-        <button onClick={() => editor?.redo()} className={chip(false)}>
-          Redo
+        <button onClick={() => editor?.redo()} className={iconButton(false)} title="Redo" aria-label="Redo">
+          <RedoIcon />
         </button>
         <button
           onClick={() => {
@@ -134,9 +152,11 @@ export default function CanvasTools({ editor }: { editor: Editor | null }) {
             editor.selectAll();
             editor.deleteShapes(editor.getSelectedShapeIds());
           }}
-          className={chip(false)}
+          className={iconButton(false)}
+          title="Clear the canvas"
+          aria-label="Clear the canvas"
         >
-          Clear
+          <TrashIcon />
         </button>
       </div>
     </div>

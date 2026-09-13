@@ -55,8 +55,12 @@ select {
 .safe-top {
   padding-top: env(safe-area-inset-top);
 }
+
+/* max(), not the raw inset. An iPad without a home indicator reports 0, and
+   because this rule is declared after Tailwind it beats any `pb-*` utility on
+   the same element — so the bottom bar sat flush against the glass. */
 .safe-bottom {
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
 }
 
 /* Chunky buttons, lifted from the Mandarin and Vote apps: a solid bottom edge
